@@ -33,9 +33,7 @@ class MpvWidget(QOpenGLWidget):
         super().__init__(parent)
         self._mpv = mpv.MPV(
             vo="libmpv",
-            hwdec="auto",                 # engage VAAPI (UHD 620) for HEVC/H264 4K
-            hwdec_codecs="all",
-            vd_lavc_dr=True,              # zero-copy direct rendering when possible
+            hwdec="auto-safe",            # VAAPI (UHD 620) when safe; never breaks playback
             ytdl=False,
             osc=False,
             input_default_bindings=False,
