@@ -39,6 +39,7 @@ class MpvWidget(QOpenGLWidget):
             input_default_bindings=False,
             cache="yes",
             demuxer_max_bytes="50MiB",
+            user_agent="QtIPTV/0.1",
         )
         self._render_ctx = None
         self._frame_ready.connect(self.update)

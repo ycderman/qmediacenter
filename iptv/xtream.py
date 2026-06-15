@@ -16,6 +16,8 @@ class XtreamClient:
         self.password = password
         self.timeout = timeout
         self._session = requests.Session()
+        # Many Xtream panels reject the default python-requests UA (520/521).
+        self._session.headers.update({"User-Agent": "QtIPTV/0.1"})
 
     # ---- low level ----------------------------------------------------
     def _api(self, action, **params):

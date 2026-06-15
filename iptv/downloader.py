@@ -27,7 +27,8 @@ class DownloadWorker(QThread):
         try:
             os.makedirs(os.path.dirname(self.dest_path), exist_ok=True)
             tmp = self.dest_path + ".part"
-            with requests.get(self.url, stream=True, timeout=30) as r:
+            headers = {"User-Agent": "QtIPTV/0.1"}
+            with requests.get(self.url, stream=True, timeout=30, headers=headers) as r:
                 r.raise_for_status()
                 total = int(r.headers.get("content-length", 0))
                 done = 0
