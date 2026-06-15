@@ -28,12 +28,14 @@ class MpvWidget(QOpenGLWidget):
     duration_changed = Signal(float)
     position_changed = Signal(float)
     pause_changed = Signal(bool)
+    info_changed = Signal(str)        # e.g. "vaapi · 3840x2160"
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._mpv = mpv.MPV(
             vo="libmpv",
             hwdec="auto-safe",            # VAAPI (UHD 620) when safe; never breaks playback
+            profile="fast",               # cheap scaler — critical for 4K→1080p on iGPU
             ytdl=False,
             osc=False,
             input_default_bindings=False,
@@ -42,8 +44,11 @@ class MpvWidget(QOpenGLWidget):
             demuxer_max_back_bytes="100MiB",
             user_agent="QtIPTV/0.1",
         )
-        # log which decoder actually engaged (helps diagnose slow 4K)
+        self._hwdec = "?"
+        self._vparams = ""
         self._mpv.observe_property("hwdec-current", self._on_hwdec)
+        self._mpv.observe_property("video-params/w", self._on_vparam)
+        self._mpv.observe_property("video-params/h", self._on_vparam)
         self._render_ctx = None
         self._frame_ready.connect(self.update)
 
@@ -94,8 +99,23 @@ class MpvWidget(QOpenGLWidget):
         self.pause_changed.emit(bool(value))
 
     def _on_hwdec(self, _name, value):
-        import logging
-        logging.getLogger(__name__).info("hwdec-current = %s", value)
+        self._hwdec = value or "software"
+        self._emit_info()
+
+    def _on_vparam(self, _name, _value):
+        try:
+            w = self._mpv.width
+            h = self._mpv.height
+            if w and h:
+                self._vparams = f"{w}x{h}"
+        except Exception:
+            pass
+        self._emit_info()
+
+    def _emit_info(self):
+        parts = [p for p in (self._hwdec, self._vparams) if p and p != "?"]
+        if parts:
+            self.info_changed.emit(" · ".join(parts))
 
     # ---- public API ---------------------------------------------------
     def play(self, url):

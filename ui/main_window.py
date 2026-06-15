@@ -121,10 +121,13 @@ class MainWindow(QMainWindow):
         self.player.duration_changed.connect(self._on_duration)
         self.player.pause_changed.connect(self._on_pause_changed)
         self.player.installEventFilter(self)
+        self.player.info_changed.connect(self._on_player_info)
         pv.addWidget(self.player, 1)
-        pv.addLayout(self._build_controls())
+        self.controls_bar = self._build_controls()
+        pv.addWidget(self.controls_bar)
         self.dl_bar = QProgressBar(); self.dl_bar.setVisible(False)
         pv.addWidget(self.dl_bar)
+        self._base_title = f"QtIPTV — {self.profile['name']}"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
         self.splitter.addWidget(self.right)
@@ -170,7 +173,9 @@ class MainWindow(QMainWindow):
         return card
 
     def _build_controls(self):
-        ctl = QHBoxLayout()
+        bar = QWidget()
+        ctl = QHBoxLayout(bar)
+        ctl.setContentsMargins(4, 2, 4, 2)
         self.btn_play = QPushButton()
         self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
         self.btn_play.clicked.connect(self.player.toggle_pause)
@@ -188,7 +193,7 @@ class MainWindow(QMainWindow):
         self.btn_fs = QPushButton("⛶")
         self.btn_fs.clicked.connect(self._toggle_fullscreen)
         ctl.addWidget(self.btn_fs)
-        return ctl
+        return bar
 
     # ---- mode / categories --------------------------------------------
     def _set_mode(self, mode):
@@ -360,7 +365,8 @@ class MainWindow(QMainWindow):
     # ---- playback ------------------------------------------------------
     def _play(self, url, title=None):
         if title:
-            self.setWindowTitle(f"QtIPTV — {title}")
+            self._base_title = f"QtIPTV — {title}"
+            self.setWindowTitle(self._base_title)
         self._duration = 0
         self.pos_slider.setValue(0)
         self.player.play(url)
@@ -412,6 +418,10 @@ class MainWindow(QMainWindow):
         icon = QStyle.SP_MediaPlay if paused else QStyle.SP_MediaPause
         self.btn_play.setIcon(self.style().standardIcon(icon))
 
+    def _on_player_info(self, info):
+        # show decoder + resolution in the title so HW decode is verifiable
+        self.setWindowTitle(f"{self._base_title}   [{info}]")
+
     def _seek(self):
         if self._duration > 0:
             self.player.seek(self.pos_slider.value() / 1000 * self._duration)
@@ -428,6 +438,10 @@ class MainWindow(QMainWindow):
     def _enter_fullscreen(self):
         self._fs = True
         self.left.hide(); self.center.hide(); self.info_card.hide()
+        self.controls_bar.hide()
+        self.centralWidget().layout().setContentsMargins(0, 0, 0, 0)
+        self.splitter.setHandleWidth(0)
+        self.right.setHandleWidth(0)
         self.showFullScreen()
 
     def _exit_fullscreen(self):
@@ -435,6 +449,10 @@ class MainWindow(QMainWindow):
             return
         self._fs = False
         self.left.show(); self.center.show(); self.info_card.show()
+        self.controls_bar.show()
+        self.centralWidget().layout().setContentsMargins(8, 8, 8, 8)
+        self.splitter.setHandleWidth(5)
+        self.right.setHandleWidth(5)
         self.showNormal()
 
     def eventFilter(self, obj, ev):
