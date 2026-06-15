@@ -33,14 +33,19 @@ class MpvWidget(QOpenGLWidget):
         super().__init__(parent)
         self._mpv = mpv.MPV(
             vo="libmpv",
-            hwdec="auto-safe",
+            hwdec="auto",                 # engage VAAPI (UHD 620) for HEVC/H264 4K
+            hwdec_codecs="all",
+            vd_lavc_dr=True,              # zero-copy direct rendering when possible
             ytdl=False,
             osc=False,
             input_default_bindings=False,
             cache="yes",
-            demuxer_max_bytes="50MiB",
+            demuxer_max_bytes="200MiB",   # bigger buffer for high-bitrate 4K streams
+            demuxer_max_back_bytes="100MiB",
             user_agent="QtIPTV/0.1",
         )
+        # log which decoder actually engaged (helps diagnose slow 4K)
+        self._mpv.observe_property("hwdec-current", self._on_hwdec)
         self._render_ctx = None
         self._frame_ready.connect(self.update)
 
@@ -89,6 +94,10 @@ class MpvWidget(QOpenGLWidget):
 
     def _on_pause(self, _name, value):
         self.pause_changed.emit(bool(value))
+
+    def _on_hwdec(self, _name, value):
+        import logging
+        logging.getLogger(__name__).info("hwdec-current = %s", value)
 
     # ---- public API ---------------------------------------------------
     def play(self, url):

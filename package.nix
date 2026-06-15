@@ -24,7 +24,6 @@ pkgs.stdenv.mkDerivation {
     makeWrapper ${py}/bin/python3 $out/bin/qtiptv \
       --add-flags "$out/share/qtiptv/main.py" \
       --chdir "$out/share/qtiptv" \
-      --prefix LD_LIBRARY_PATH : "${pkgs.mpv-unwrapped}/lib:${pkgs.libGL}/lib" \
       --set LIBVA_DRIVER_NAME iHD \
       --set LC_NUMERIC C \
       --set QT_QPA_PLATFORM "wayland;xcb"
