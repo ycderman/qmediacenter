@@ -54,7 +54,9 @@ def load_settings():
         with open(SETTINGS_FILE, encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"download_dir": os.path.expanduser("~/Downloads"), "volume": 100}
+        # No download_dir here on purpose: an empty value makes the caller fall
+        # back to download_dir() (locale-correct ~/İndirilenler).
+        return {"volume": 100}
 
 
 def save_settings(settings):
