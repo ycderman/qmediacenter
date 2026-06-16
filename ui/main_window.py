@@ -167,7 +167,10 @@ class MainWindow(QMainWindow):
         self.btn_play_info.clicked.connect(lambda: self._on_content_activated(self.content_list.currentItem()))
         self.btn_dl_info = QPushButton("⬇  Download")
         self.btn_dl_info.clicked.connect(self._download_selected)
-        btns.addWidget(self.btn_play_info); btns.addWidget(self.btn_dl_info); btns.addStretch()
+        self.btn_back_info = QPushButton("←  Back")
+        self.btn_back_info.clicked.connect(self._on_back)
+        btns.addWidget(self.btn_play_info); btns.addWidget(self.btn_dl_info)
+        btns.addWidget(self.btn_back_info); btns.addStretch()
         right.addLayout(btns)
         h.addLayout(right, 1)
         return card
@@ -272,6 +275,16 @@ class MainWindow(QMainWindow):
         d = item.data(ROLE)
         if d == "__back__":
             return
+        # Live channels play straight away on selection (no Play click needed).
+        if self.mode == "live":
+            self._play(self.client.live_url(d.get("stream_id")), d.get("name"))
+            self.info_title.setText(d.get("name") or "?")
+            self.info_meta.setText(""); self.info_plot.setText("")
+            self.info_poster.clear()
+            url = d.get("stream_icon")
+            if url:
+                self.images.load(url, lambda pm: self.info_poster.setPixmap(pm))
+            return
         name = d.get("name") or d.get("title") or "?"
         self.info_title.setText(name)
         self.info_poster.clear()
@@ -335,6 +348,18 @@ class MainWindow(QMainWindow):
             else:
                 ext = d.get("container_extension") or "mp4"
                 self._play(self.client.series_url(d.get("id"), ext), d.get("title"))
+
+    def _on_back(self):
+        # Series episodes -> back to the series list; otherwise stop & reset.
+        if self.mode == "series" and self.viewing_series is not None:
+            self.viewing_series = None
+            self._on_category(self.cat_list.currentItem())
+            return
+        self.player.stop()
+        self.setWindowTitle(self._base_title)
+        self.info_title.setText("Select something to watch")
+        self.info_meta.setText(""); self.info_plot.setText("")
+        self.info_poster.clear()
 
     def _open_series(self, series):
         self.viewing_series = series
@@ -481,5 +506,8 @@ class MainWindow(QMainWindow):
         w.start()
 
     def closeEvent(self, ev):
+        self.downloads.shutdown()   # join download threads (avoids QThread abort)
+        for w in list(self._workers):
+            w.wait(3000)
         self.player.shutdown()
         super().closeEvent(ev)
