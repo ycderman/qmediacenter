@@ -1,4 +1,4 @@
-# Build:  nix-build package.nix      Run:  ./result/bin/qtiptv
+# Build:  nix-build package.nix      Run:  ./result/bin/qplayer
 { pkgs ? import <nixpkgs> { } }:
 let
   py = pkgs.python3.withPackages (ps: with ps; [
@@ -10,7 +10,7 @@ let
   ]);
 in
 pkgs.stdenv.mkDerivation {
-  pname = "qtiptv";
+  pname = "qplayer";
   version = "0.1.0";
   src = ./.;
 
@@ -19,11 +19,11 @@ pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    mkdir -p $out/share/qtiptv $out/bin
-    cp -r main.py iptv ui $out/share/qtiptv/
-    makeWrapper ${py}/bin/python3 $out/bin/qtiptv \
-      --add-flags "$out/share/qtiptv/main.py" \
-      --chdir "$out/share/qtiptv" \
+    mkdir -p $out/share/qplayer $out/bin
+    cp -r main.py iptv ui $out/share/qplayer/
+    makeWrapper ${py}/bin/python3 $out/bin/qplayer \
+      --add-flags "$out/share/qplayer/main.py" \
+      --chdir "$out/share/qplayer" \
       --prefix LD_LIBRARY_PATH : "${pkgs.libglvnd}/lib:${pkgs.libGL}/lib" \
       --set LIBVA_DRIVER_NAME iHD \
       --set LC_NUMERIC C \
@@ -35,6 +35,6 @@ pkgs.stdenv.mkDerivation {
     description = "Qt6/libmpv IPTV player with Xtream Codes support";
     license = licenses.mit;
     platforms = platforms.linux;
-    mainProgram = "qtiptv";
+    mainProgram = "qplayer";
   };
 }

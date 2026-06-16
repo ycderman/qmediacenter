@@ -11,7 +11,7 @@ from iptv.xtream import XtreamClient
 class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("QtIPTV — Xtream Login")
+        self.setWindowTitle("QPlayer — Xtream Login")
         self.setMinimumWidth(420)
         self.profile = None
         self._profiles = config.load_profiles()
@@ -84,6 +84,9 @@ class LoginDialog(QDialog):
         self._profiles = [p for p in self._profiles if p.get("name") != name]
         self._profiles.append(profile)
         config.save_profiles(self._profiles)
+        settings = config.load_settings()
+        settings["last_profile"] = name
+        config.save_settings(settings)
         self.profile = profile
         self.client = client
         self.accept()

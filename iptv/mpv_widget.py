@@ -44,8 +44,9 @@ class MpvWidget(QOpenGLWidget):
             demuxer_max_back_bytes="100MiB",
             user_agent="QtIPTV/0.1",
         )
+        self._alive = True
         self._hwdec = "?"
-        self._vparams = ""
+        self._vw = self._vh = 0
         self._mpv.observe_property("hwdec-current", self._on_hwdec)
         self._mpv.observe_property("video-params/w", self._on_vparam)
         self._mpv.observe_property("video-params/h", self._on_vparam)
@@ -68,7 +69,7 @@ class MpvWidget(QOpenGLWidget):
                 opengl_init_params={"get_proc_address": self._proc_addr_cb},
             )
             # mpv calls this from a non-GUI thread; just ask Qt to repaint.
-            self._render_ctx.update_cb = lambda: self._frame_ready.emit()
+            self._render_ctx.update_cb = lambda: self._alive and self._frame_ready.emit()
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("MpvRenderContext init failed: %s", e)
@@ -87,33 +88,39 @@ class MpvWidget(QOpenGLWidget):
         )
 
     # ---- property callbacks ------------------------------------------
+    # NB: never query mpv here (no self._mpv.<prop>) — doing so during teardown
+    # races with mpv.terminate() and segfaults. Use the observed value only.
     def _on_duration(self, _name, value):
-        if value is not None:
+        if self._alive and value is not None:
             self.duration_changed.emit(float(value))
 
     def _on_time_pos(self, _name, value):
-        if value is not None:
+        if self._alive and value is not None:
             self.position_changed.emit(float(value))
 
     def _on_pause(self, _name, value):
-        self.pause_changed.emit(bool(value))
+        if self._alive:
+            self.pause_changed.emit(bool(value))
 
     def _on_hwdec(self, _name, value):
+        if not self._alive:
+            return
         self._hwdec = value or "software"
         self._emit_info()
 
-    def _on_vparam(self, _name, _value):
-        try:
-            w = self._mpv.width
-            h = self._mpv.height
-            if w and h:
-                self._vparams = f"{w}x{h}"
-        except Exception:
-            pass
+    def _on_vparam(self, name, value):
+        if not self._alive:
+            return
+        if value:
+            if name == "video-params/w":
+                self._vw = value
+            elif name == "video-params/h":
+                self._vh = value
         self._emit_info()
 
     def _emit_info(self):
-        parts = [p for p in (self._hwdec, self._vparams) if p and p != "?"]
+        vparams = f"{self._vw}x{self._vh}" if self._vw and self._vh else ""
+        parts = [p for p in (self._hwdec, vparams) if p and p != "?"]
         if parts:
             self.info_changed.emit(" · ".join(parts))
 
@@ -144,12 +151,14 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.volume = max(0, min(150, volume))
 
     def shutdown(self):
+        # Stop callbacks from touching mpv before we tear it down (avoids SEGV).
+        self._alive = False
         if self._render_ctx is not None:
             try:
                 self.makeCurrent()
+                self._render_ctx.free()
             except Exception:
                 pass
-            self._render_ctx.free()
             self._render_ctx = None
         try:
             self._mpv.terminate()

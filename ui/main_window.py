@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
 
         self.accent = desktop_accent()
         self.setStyleSheet(build_qss(self.accent))
-        self.setWindowTitle(f"QtIPTV — {profile['name']}")
+        self.setWindowTitle(f"QPlayer — {profile['name']}")
         self.resize(1320, 820)
         self._build_ui()
         self._set_mode("live")
@@ -127,7 +127,7 @@ class MainWindow(QMainWindow):
         pv.addWidget(self.controls_bar)
         self.dl_bar = QProgressBar(); self.dl_bar.setVisible(False)
         pv.addWidget(self.dl_bar)
-        self._base_title = f"QtIPTV — {self.profile['name']}"
+        self._base_title = f"QPlayer — {self.profile['name']}"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
         self.splitter.addWidget(self.right)
@@ -365,7 +365,7 @@ class MainWindow(QMainWindow):
     # ---- playback ------------------------------------------------------
     def _play(self, url, title=None):
         if title:
-            self._base_title = f"QtIPTV — {title}"
+            self._base_title = f"QPlayer — {title}"
             self.setWindowTitle(self._base_title)
         self._duration = 0
         self.pos_slider.setValue(0)
