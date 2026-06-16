@@ -418,10 +418,15 @@ class MainWindow(QMainWindow):
         self.downloads.start(url, name or "download", ext, subdir)
 
     def _on_dl_progress(self, name, done, total):
-        if total:
-            self.dl_bar.setMaximum(total); self.dl_bar.setValue(done)
+        # QProgressBar uses 32-bit ints, so scale bytes to a 0-100 percentage.
+        mb = done / (1 << 20)
+        if total > 0:
+            self.dl_bar.setMaximum(100)
+            self.dl_bar.setValue(int(done * 100 / total))
+            self.dl_bar.setFormat(f"{name}  {mb:.0f}/{total/(1<<20):.0f} MB  %p%")
         else:
-            self.dl_bar.setMaximum(0)
+            self.dl_bar.setMaximum(0)  # indeterminate
+            self.dl_bar.setFormat(f"{name}  {mb:.0f} MB")
 
     def _on_dl_done(self, name, path):
         self.dl_bar.setVisible(False)

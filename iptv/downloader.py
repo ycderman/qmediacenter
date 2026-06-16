@@ -44,9 +44,14 @@ class DownloadWorker(QThread):
                 try:
                     with requests.get(self.url, stream=True, timeout=30, headers=headers) as r:
                         r.raise_for_status()
-                        remaining = int(r.headers.get("content-length", 0))
-                        total = done + remaining
-                        with open(tmp, "ab" if done else "wb") as f:
+                        # If we asked to resume (Range) but the server ignored it
+                        # (200 instead of 206), it's resending the whole file —
+                        # restart from scratch, otherwise we'd append duplicates.
+                        if done and r.status_code != 206:
+                            done = 0
+                        mode = "ab" if done else "wb"
+                        total = done + int(r.headers.get("content-length", 0))
+                        with open(tmp, mode) as f:
                             for chunk in r.iter_content(chunk_size=1 << 20):
                                 if self._cancel:
                                     self.failed.emit("cancelled")
