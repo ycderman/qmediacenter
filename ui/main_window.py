@@ -127,8 +127,14 @@ class MainWindow(QMainWindow):
         pv.addWidget(self.player, 1)
         self.controls_bar = self._build_controls()
         pv.addWidget(self.controls_bar)
-        self.dl_bar = QProgressBar(); self.dl_bar.setVisible(False)
-        pv.addWidget(self.dl_bar)
+        self.dl_row = QWidget(); self.dl_row.setVisible(False)
+        dl_h = QHBoxLayout(self.dl_row); dl_h.setContentsMargins(0, 0, 0, 0)
+        self.dl_bar = QProgressBar()
+        dl_h.addWidget(self.dl_bar, 1)
+        self.btn_dl_stop = QPushButton("⏹  Stop")
+        self.btn_dl_stop.clicked.connect(self.downloads.cancel_all)
+        dl_h.addWidget(self.btn_dl_stop)
+        pv.addWidget(self.dl_row)
         self._base_title = f"QPlayer — {self.profile['name']}"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
@@ -413,7 +419,7 @@ class MainWindow(QMainWindow):
                                  d.get("title"), ext, self.viewing_series.get("name", ""))
 
     def _start_download(self, url, name, ext, subdir=""):
-        self.dl_bar.setVisible(True)
+        self.dl_row.setVisible(True)
         self.dl_bar.setFormat(f"{name} — %p%")
         self.downloads.start(url, name or "download", ext, subdir)
 
@@ -429,11 +435,11 @@ class MainWindow(QMainWindow):
             self.dl_bar.setFormat(f"{name}  {mb:.0f} MB")
 
     def _on_dl_done(self, name, path):
-        self.dl_bar.setVisible(False)
+        self.dl_row.setVisible(False)
         QMessageBox.information(self, "Download complete", f"{name}\n→ {path}")
 
     def _on_dl_failed(self, name, err):
-        self.dl_bar.setVisible(False)
+        self.dl_row.setVisible(False)
         if err != "cancelled":
             QMessageBox.warning(self, "Download failed", f"{name}\n{err}")
 

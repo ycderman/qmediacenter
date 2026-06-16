@@ -112,6 +112,11 @@ class DownloadManager(QObject):
         if worker in self._workers:
             self._workers.remove(worker)
 
+    def cancel_all(self):
+        """Stop active downloads (async); the .part is kept for later resume."""
+        for w in list(self._workers):
+            w.cancel()
+
     def shutdown(self):
         """Cancel and join all downloads — avoids 'QThread destroyed while
         running' aborts when the window closes mid-download."""
