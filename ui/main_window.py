@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QLineEdit, QLabel, QSlider, QSplitter, QStyle, QMessageBox,
     QProgressBar, QFrame, QScrollArea, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QThread, Signal, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QStandardPaths
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 
 from iptv import config
@@ -45,8 +45,10 @@ class MainWindow(QMainWindow):
         self._workers = []
         self._fs = False
 
+        default_dl = (QStandardPaths.writableLocation(QStandardPaths.DownloadLocation)
+                      or os.path.expanduser("~/Downloads"))
         self.downloads = DownloadManager(
-            self.settings.get("download_dir", os.path.expanduser("~/Downloads")), self)
+            self.settings.get("download_dir") or default_dl, self)
         self.downloads.progress.connect(self._on_dl_progress)
         self.downloads.finished_ok.connect(self._on_dl_done)
         self.downloads.failed.connect(self._on_dl_failed)

@@ -35,7 +35,8 @@ class DownloadWorker(QThread):
         try:
             os.makedirs(os.path.dirname(self.dest_path), exist_ok=True)
             done = os.path.getsize(tmp) if os.path.exists(tmp) else 0
-            attempts = 0
+            stall = 0          # consecutive failures with no new bytes
+            last_done = -1
             while True:
                 headers = {"User-Agent": UA}
                 if done:
@@ -56,9 +57,17 @@ class DownloadWorker(QThread):
                                     self.progress.emit(done, total)
                     break  # completed without error
                 except _RESUMABLE:
-                    attempts += 1
-                    if self._cancel or attempts > 6:
+                    if self._cancel:
                         raise
+                    # IPTV servers often drop the connection mid-file; keep
+                    # resuming via Range as long as we're still making progress.
+                    if done > last_done:
+                        last_done = done
+                        stall = 0
+                    else:
+                        stall += 1
+                        if stall > 8:
+                            raise
                     # loop again with a Range request resuming from `done`
             os.replace(tmp, self.dest_path)
             self.finished_ok.emit(self.dest_path)
