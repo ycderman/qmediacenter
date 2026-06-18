@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"QMediaCenter — {profile['name']}")
         self.resize(1320, 820)
         self._build_ui()
-        self._set_mode("live")
+        self._show_home()
 
     # ---- UI ------------------------------------------------------------
     def _build_ui(self):
@@ -96,6 +96,9 @@ class MainWindow(QMainWindow):
         self.nav_bar = QWidget()
         nav = QHBoxLayout(self.nav_bar)
         nav.setContentsMargins(4, 4, 4, 4)
+        self.btn_home = QPushButton("🏠 Home"); self.btn_home.setCheckable(True)
+        self.btn_home.clicked.connect(self._show_home)
+        nav.addWidget(self.btn_home)
         self.btn_live = QPushButton("📺 Live")
         self.btn_vod = QPushButton("🎬 Movies")
         self.btn_series = QPushButton("📺 Series")
@@ -204,9 +207,16 @@ class MainWindow(QMainWindow):
         self.library_page = self._build_library_page()
         self.pages.addWidget(self.library_page)
 
+        # --- home page: rows (Continue Watching / Favorites / Recently Added) ---
+        self.home_page = self._build_home_page()
+        self.pages.addWidget(self.home_page)
+
         self._duration = 0
         self._current_key = None
         self._current_title = ""
+        self._current_url = ""
+        self._current_poster = ""
+        self._current_kind = "movie"
         self._resume_target = 0.0
         self._last_save = 0.0
         self.player.set_volume(self.vol.value())
@@ -284,7 +294,7 @@ class MainWindow(QMainWindow):
         return page
 
     def _show_library(self):
-        for b in (self.btn_live, self.btn_vod, self.btn_series):
+        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_home):
             b.setChecked(False)
         self.btn_library.setChecked(True)
         self.pages.setCurrentWidget(self.library_page)
@@ -356,6 +366,89 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Scan failed", str(result))
         self._populate_library()
 
+    # ---- home (rowed landing page) ------------------------------------
+    def _build_home_page(self):
+        scroll = QScrollArea(); scroll.setWidgetResizable(True)
+        scroll.setObjectName("HomeScroll"); scroll.setFrameShape(QFrame.NoFrame)
+        container = QWidget()
+        self.home_vbox = QVBoxLayout(container)
+        self.home_vbox.setContentsMargins(8, 8, 8, 8)
+        self.home_vbox.setSpacing(6)
+        scroll.setWidget(container)
+        return scroll
+
+    def _show_home(self):
+        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_library):
+            b.setChecked(False)
+        self.btn_home.setChecked(True)
+        self.pages.setCurrentWidget(self.home_page)
+        self._populate_home()
+
+    def _populate_home(self):
+        # clear previous rows
+        while self.home_vbox.count():
+            it = self.home_vbox.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        rows = [
+            ("▶  Continue Watching", self.db.continue_watching(20)),
+            ("⭐  Favorites", self.db.favorites(40)),
+            ("🆕  Recently Added", self.db.media(order="recent", limit=40)),
+            ("🎬  Movies", self.db.media(kind="movie", limit=40)),
+            ("📺  TV", self.db.media(kind="episode", limit=40)),
+        ]
+        any_row = False
+        for title, items in rows:
+            if items:
+                any_row = True
+                self.home_vbox.addWidget(self._home_row(title, items))
+        if not any_row:
+            hint = QLabel("Your home screen fills up as you add content.\n"
+                          "Add folders via ⚙ Sources, scan your library, and start watching.")
+            hint.setObjectName("Meta"); hint.setAlignment(Qt.AlignCenter)
+            self.home_vbox.addWidget(hint)
+        self.home_vbox.addStretch()
+
+    def _home_row(self, title, items):
+        box = QWidget(); v = QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0); v.setSpacing(2)
+        lbl = QLabel(title); lbl.setObjectName("Header")
+        v.addWidget(lbl)
+        strip = QListWidget(); strip.setObjectName("Strip")
+        strip.setViewMode(QListWidget.IconMode)
+        strip.setFlow(QListWidget.LeftToRight)
+        strip.setWrapping(False)
+        strip.setMovement(QListWidget.Static)
+        strip.setIconSize(POSTER)
+        strip.setFixedHeight(POSTER.height() + 54)
+        strip.setHorizontalScrollMode(QListWidget.ScrollPerPixel)
+        strip.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        strip.setUniformItemSizes(True)
+        strip.setWordWrap(True)
+        for d in items:
+            label = d.get("title") or "?"
+            extra = d.get("extra") or {}
+            if d.get("year"):
+                label += f"  ({d['year']})"
+            pos, dur = (d.get("position"), d.get("duration"))
+            if pos and dur:
+                label = f"%{int(pos / dur * 100)} · " + label
+            elif d.get("rating"):
+                label += f"  ⭐{d['rating']:.1f}"
+            it = QListWidgetItem(label)
+            it.setData(ROLE, d)
+            it.setSizeHint(QSize(POSTER.width() + 18, POSTER.height() + 50))
+            it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
+            poster = d.get("poster")
+            if poster and poster.startswith(("http://", "https://")):
+                self._load_poster(it, poster)
+            elif poster and os.path.exists(poster):
+                it.setIcon(QIcon(QPixmap(poster)))
+            strip.addItem(it)
+        strip.itemClicked.connect(lambda i: self._play_item(i.data(ROLE)))
+        v.addWidget(strip)
+        return box
+
     def _build_controls(self):
         bar = QWidget()
         bar.setObjectName("ControlsBar")
@@ -393,6 +486,7 @@ class MainWindow(QMainWindow):
         self.mode = mode
         self.viewing_series = None
         self.btn_library.setChecked(False)
+        self.btn_home.setChecked(False)
         for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
             b.setChecked(m == mode)
         grid = mode in ("vod", "series")
@@ -594,7 +688,7 @@ class MainWindow(QMainWindow):
         self.content_header.setText(f"{nm} — {count} episodes")
 
     # ---- playback ------------------------------------------------------
-    def _play(self, url, title=None, item_key=None):
+    def _play(self, url, title=None, item_key=None, poster="", kind="movie"):
         if not url:
             return
         self.pages.setCurrentWidget(self.watch_page)
@@ -604,6 +698,9 @@ class MainWindow(QMainWindow):
         self._duration = 0
         self._current_key = item_key
         self._current_title = title or ""
+        self._current_url = url
+        self._current_poster = poster or ""
+        self._current_kind = kind or "movie"
         self._last_save = 0.0
         # Resume from the saved position once the duration is known.
         pos, _dur = self.db.get_progress(item_key) if item_key else (0.0, 0.0)
@@ -611,6 +708,17 @@ class MainWindow(QMainWindow):
         self.pos_slider.setValue(0)
         self.player.play(url)
         self._show_controls()
+
+    def _play_item(self, d):
+        """Play a media/progress/favorite row dict from the home screen."""
+        if not d:
+            return
+        url = d.get("path") or (d.get("extra") or {}).get("url")
+        key = d.get("item_key", "")
+        if not url and key.startswith("local:"):
+            url = key[len("local:"):]
+        self._play(url, d.get("title"), item_key=key or None,
+                   poster=d.get("poster", ""), kind=d.get("kind", "movie"))
 
     # ---- download ------------------------------------------------------
     def _download_selected(self):
@@ -660,7 +768,10 @@ class MainWindow(QMainWindow):
         if self._current_key and self._duration > 0 and pos - self._last_save >= 5:
             self._last_save = pos
             self.db.save_progress(self._current_key, pos, self._duration,
-                                  title=self._current_title, kind="movie")
+                                  source=self._current_key.split(":", 1)[0],
+                                  title=self._current_title, kind=self._current_kind,
+                                  poster=self._current_poster,
+                                  extra={"url": self._current_url})
 
     def _on_duration(self, dur):
         self._duration = dur or 0

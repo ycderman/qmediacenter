@@ -120,6 +120,19 @@ def build_qss(accent="#3daee9"):
     QListWidget#Grid::item:hover {{ background-color: #e8f2fb; border-color: {accent}; }}
     QListWidget#Grid::item:selected {{ background-color: {accent}; color: #ffffff; }}
 
+    /* home page rows */
+    QScrollArea#HomeScroll {{ background-color: #eff0f1; border: none; }}
+    QListWidget#Strip {{ background-color: transparent; border: none; outline: 0; }}
+    QListWidget#Strip::item {{
+        margin: 4px 6px; padding: 6px;
+        border-radius: 10px;
+        background-color: #ffffff;
+        border: 1px solid #e0e3e6;
+        color: #232629;
+    }}
+    QListWidget#Strip::item:hover {{ background-color: #e8f2fb; border-color: {accent}; }}
+    QListWidget#Strip::item:selected {{ background-color: #e8f2fb; border-color: {accent}; color: #232629; }}
+
     /* info card */
     QFrame#InfoCard {{
         background-color: #f7f8f9;
