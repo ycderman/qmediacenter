@@ -2,9 +2,21 @@
 import json
 import os
 
-CONFIG_DIR = os.path.join(
-    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "qtiptv"
-)
+_CONFIG_ROOT = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+CONFIG_DIR = os.path.join(_CONFIG_ROOT, "qmediacenter")
+_LEGACY_DIR = os.path.join(_CONFIG_ROOT, "qtiptv")
+
+
+def _migrate_legacy():
+    """One-time rename of the old ~/.config/qtiptv data into the new dir."""
+    if os.path.isdir(_LEGACY_DIR) and not os.path.exists(CONFIG_DIR):
+        try:
+            os.rename(_LEGACY_DIR, CONFIG_DIR)
+        except OSError:
+            pass
+
+
+_migrate_legacy()
 PROFILES_FILE = os.path.join(CONFIG_DIR, "profiles.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 

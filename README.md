@@ -1,13 +1,20 @@
-# QtIPTV
+# QMediaCenter
 
-A minimal **Qt6 (PySide6) + libmpv** IPTV player with **Xtream Codes** support.
+A **Qt6 (PySide6) + libmpv** media center: IPTV (Xtream Codes), a self-built
+library for local and network media, and optional Emby/Plex integration —
+with posters and **IMDb ratings**.
 
 - Embedded mpv player (OpenGL render API → works on Wayland *and* X11) with
-  full hardware decoding (VAAPI) and every codec mpv supports — HEVC, AC-3,
-  E-AC3, DTS, … — so audio/video "just works" like EngPlayer.
-- **Live TV**, **Movies (VOD)** and **Series** browsing by category.
-- **Download** option for movies and episodes.
-- Profile login with credentials saved in `~/.config/qtiptv/`.
+  full hardware decoding (VAAPI) and every codec mpv supports (HEVC, AC-3,
+  E-AC3, DTS, …).
+- **IPTV**: Live TV, Movies (VOD) and Series browsing, with downloads.
+- **Own library**: scan local and network (NFS/SMB-mounted) folders for video,
+  music and photos; filenames are parsed into titles, enriched with posters,
+  overviews and IMDb ratings.
+- **Continue Watching**: resume positions and favourites, shared across sources.
+- **Sources menu** in-app: add folders, IPTV accounts, Emby/Plex servers and
+  metadata API keys — nothing is hard-coded.
+- KDE Breeze Light theme; accent follows the desktop.
 
 ## Architecture
 
@@ -15,41 +22,31 @@ A minimal **Qt6 (PySide6) + libmpv** IPTV player with **Xtream Codes** support.
 main.py                entry point (QApplication + login + main window)
 iptv/
   xtream.py            Xtream Codes API client
-  config.py            profile / settings persistence (JSON)
-  mpv_widget.py        QOpenGLWidget that renders libmpv (the hard part)
+  config.py            profiles / settings + media-center config
+  mpv_widget.py        QOpenGLWidget that renders libmpv
   downloader.py        threaded HTTP download manager
+  image_loader.py      async poster/thumbnail loader with disk cache
+media/
+  library_db.py        SQLite: resume, favourites, scanned media, meta cache
+  metadata.py          TMDb (posters/overview) + OMDb (IMDb rating)
+  local_scanner.py     local/network folder scanner + filename parser
 ui/
   login_dialog.py      Xtream profile entry / selection
-  main_window.py       sidebar (Live/Movies/Series) + content list + player
-package.nix            Nix derivation (wrapped runnable binary)
-shell.nix              dev shell
+  sources_dialog.py    Sources & settings menu
+  main_window.py       navigation + content/library pages + player
+  style.py             KDE Breeze Light Qt stylesheet
 ```
 
-## Run (NixOS)
+## Metadata keys (optional)
 
-```sh
-nix-build package.nix
-./result/bin/qtiptv
-```
+Posters and IMDb ratings need free API keys, entered in **⚙ Sources → Metadata**:
 
-Or for development:
+- [TMDb](https://www.themoviedb.org/settings/api) — posters, overviews, IMDb id
+- [OMDb](https://www.omdbapi.com/apikey.aspx) — IMDb rating
 
-```sh
-nix-build -o /tmp/pyenv -E 'with import <nixpkgs>{}; \
-  python3.withPackages(ps: with ps;[pyside6 mpv pyopengl requests yt-dlp])'
-LD_LIBRARY_PATH=$(nix eval --raw nixpkgs#mpv-unwrapped)/lib \
-LC_NUMERIC=C QT_QPA_PLATFORM="wayland;xcb" \
-  /tmp/pyenv/bin/python3 main.py
-```
-
-## Notes / next steps
-
-This is a working **v0.1 foundation**, not feature-parity with EngPlayer yet.
-Natural next additions: poster/thumbnail grid (async image loading), EPG for
-Live TV, resume/watch-history, favourites, search across all content, and a
-KDE-Breeze-aware Qt stylesheet.
+The library works without them; you just won't get artwork or ratings.
 
 ## Tested
 
-- `test_ui.py` — end-to-end UI flow against a fake Xtream client (categories,
-  content, series → episodes, mode switching). All threading paths exercised.
+- `test_ui.py` — end-to-end UI flow against a fake Xtream client.
+- Library DB, scanner and metadata paths covered by headless checks.

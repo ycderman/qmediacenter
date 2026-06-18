@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""QPlayer — a Qt6/libmpv IPTV player with Xtream Codes support."""
+"""QMediaCenter — a Qt6/libmpv media center (IPTV + local/network library)."""
 import sys
 import locale
 import logging
@@ -29,8 +29,8 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = QApplication(sys.argv)
-    app.setApplicationName("QPlayer")
-    app.setDesktopFileName("io.github.ycderman.qplayer")
+    app.setApplicationName("QMediaCenter")
+    app.setDesktopFileName("io.github.ycderman.qmediacenter")
     # Qt resets LC_NUMERIC from the environment; libmpv requires "C".
     locale.setlocale(locale.LC_NUMERIC, "C")
 

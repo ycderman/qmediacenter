@@ -21,7 +21,7 @@ from ui.login_dialog import LoginDialog
 class SourcesDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("QPlayer — Sources & Settings")
+        self.setWindowTitle("QMediaCenter — Sources & Settings")
         self.setMinimumSize(620, 520)
         self.scan_requested = False
         self._cfg = config.media_config()

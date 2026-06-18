@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
 
         self.accent = desktop_accent()
         self.setStyleSheet(build_qss(self.accent))
-        self.setWindowTitle(f"QPlayer — {profile['name']}")
+        self.setWindowTitle(f"QMediaCenter — {profile['name']}")
         self.resize(1320, 820)
         self._build_ui()
         self._set_mode("live")
@@ -194,7 +194,7 @@ class MainWindow(QMainWindow):
         self.btn_dl_stop.clicked.connect(self.downloads.cancel_all)
         dl_h.addWidget(self.btn_dl_stop)
         pv.addWidget(self.dl_row)
-        self._base_title = f"QPlayer — {self.profile['name']}"
+        self._base_title = f"QMediaCenter — {self.profile['name']}"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
         watch_layout.addWidget(self.right, 1)
@@ -599,7 +599,7 @@ class MainWindow(QMainWindow):
             return
         self.pages.setCurrentWidget(self.watch_page)
         if title:
-            self._base_title = f"QPlayer — {title}"
+            self._base_title = f"QMediaCenter — {title}"
             self.setWindowTitle(self._base_title)
         self._duration = 0
         self._current_key = item_key

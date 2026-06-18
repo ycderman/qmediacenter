@@ -6,7 +6,7 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 from PySide6.QtGui import QPixmap
 
 CACHE_DIR = os.path.join(
-    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "qtiptv", "posters"
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "qmediacenter", "posters"
 )
 
 
