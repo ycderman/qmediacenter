@@ -24,11 +24,14 @@ win = MainWindow({"name": "Test"}, FakeClient())
 win.show()
 
 results = []
+pages = []
 def step1():
     results.append(("live categories", win.cat_list.count()))
+    pages.append(("categories page", win.pages.currentWidget() is win.left))
     win.cat_list.setCurrentRow(0)
 def step2():
     results.append(("live streams", win.content_list.count()))
+    pages.append(("content page", win.pages.currentWidget() is win.center))
     win._set_mode("series")
 def step3():
     results.append(("series categories", win.cat_list.count()))
@@ -38,14 +41,20 @@ def step4():
     win._on_content_activated(win.content_list.item(0))  # open series -> episodes
 def step5():
     results.append(("episodes (incl back)", win.content_list.count()))
+    pages.append(("episodes page", win.pages.currentWidget() is win.center))
+    win.content_list.setCurrentRow(1)
+def step6():
+    pages.append(("watch page", win.pages.currentWidget() is win.watch_page))
     for label, n in results:
         print(f"  {label}: {n}")
+    for label, ok in pages:
+        print(f"  {label}: {'PASS' if ok else 'FAIL'}")
     ok = (results[0][1] >= 1 and results[1][1] >= 2 and results[2][1] >= 1
-          and results[3][1] >= 1 and results[4][1] >= 2)
+          and results[3][1] >= 1 and results[4][1] >= 2 and all(ok for _, ok in pages))
     print("RESULT:", "PASS" if ok else "FAIL")
     win.player.shutdown()
     app.quit()
 
-for i, fn in enumerate((step1, step2, step3, step4, step5), 1):
+for i, fn in enumerate((step1, step2, step3, step4, step5, step6), 1):
     QTimer.singleShot(i * 900, fn)
 sys.exit(app.exec())

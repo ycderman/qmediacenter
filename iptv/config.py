@@ -63,3 +63,28 @@ def save_settings(settings):
     _ensure_dir()
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+# ---- media-center configuration ---------------------------------------
+# Stored inside settings.json so existing persistence keeps working.
+#   tmdb_key / omdb_key : metadata + IMDb rating API keys (optional)
+#   library_paths       : list of local/NFS folders to scan
+#   emby / plex         : {"url":..., "api_key"/"token":..., "user_id":...}
+
+def media_config():
+    s = load_settings()
+    return {
+        "tmdb_key": s.get("tmdb_key", ""),
+        "omdb_key": s.get("omdb_key", ""),
+        "library_paths": s.get("library_paths", []),
+        "emby": s.get("emby", {}),
+        "plex": s.get("plex", {}),
+    }
+
+
+def save_media_config(cfg):
+    s = load_settings()
+    for key in ("tmdb_key", "omdb_key", "library_paths", "emby", "plex"):
+        if key in cfg:
+            s[key] = cfg[key]
+    save_settings(s)

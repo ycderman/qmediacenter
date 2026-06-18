@@ -30,29 +30,31 @@ def desktop_accent(default="#3daee9"):
 
 
 def build_qss(accent="#3daee9"):
+    # KDE Breeze Light palette: window #eff0f1, view #ffffff, text #232629,
+    # borders #bcc0c4, disabled #9aa0a3. Accent comes from the desktop portal.
     return f"""
     * {{
         font-size: 14px;
-        color: #e6e6ea;
+        color: #232629;
     }}
     QMainWindow, QDialog, QWidget {{
-        background-color: #16161e;
+        background-color: #eff0f1;
     }}
     QLabel {{ background: transparent; }}
-    QLabel#Header {{ font-size: 15px; font-weight: 600; color: #c8c8d4; padding: 2px 0; }}
-    QLabel#Title {{ font-size: 20px; font-weight: 700; color: #ffffff; }}
-    QLabel#Meta {{ color: #9a9ab0; font-size: 13px; }}
-    QLabel#Plot {{ color: #c4c4d2; font-size: 13px; }}
+    QLabel#Header {{ font-size: 15px; font-weight: 600; color: #31363b; padding: 2px 0; }}
+    QLabel#Title {{ font-size: 20px; font-weight: 700; color: #1a1d1f; }}
+    QLabel#Meta {{ color: #7f8c8d; font-size: 13px; }}
+    QLabel#Plot {{ color: #4d5256; font-size: 13px; }}
 
     /* nav + action buttons */
     QPushButton {{
-        background-color: #24242f;
-        border: 1px solid #2f2f3d;
+        background-color: #fcfcfc;
+        border: 1px solid #bcc0c4;
         border-radius: 8px;
         padding: 8px 14px;
-        color: #e6e6ea;
+        color: #232629;
     }}
-    QPushButton:hover {{ background-color: #2e2e3c; }}
+    QPushButton:hover {{ background-color: #e8f2fb; border-color: {accent}; }}
     QPushButton:pressed {{ background-color: {accent}; color: #ffffff; }}
     QPushButton:checked {{
         background-color: {accent};
@@ -60,22 +62,40 @@ def build_qss(accent="#3daee9"):
         color: #ffffff;
         font-weight: 600;
     }}
-    QPushButton:disabled {{ color: #6a6a7a; background-color: #1d1d27; }}
+    QPushButton:disabled {{ color: #b3b8bb; background-color: #f3f4f5; border-color: #d4d7da; }}
+
+    /* transport buttons (play / pause / stop) — big readable glyphs */
+    QPushButton#Transport {{
+        font-size: 18px;
+        min-width: 38px;
+        padding: 6px 10px;
+        background-color: #fcfcfc;
+    }}
+    QPushButton#Transport:hover {{ background-color: #e8f2fb; }}
+    QPushButton#Transport:disabled {{ color: {accent}; background-color: #f3f4f5; }}
+
+    /* controls bar overlaid on the video (translucent light) */
+    QWidget#ControlsBar {{
+        background-color: rgba(239, 240, 241, 0.92);
+        border-top: 1px solid #d4d7da;
+    }}
 
     /* search / inputs */
     QLineEdit {{
-        background-color: #1d1d27;
-        border: 1px solid #2f2f3d;
+        background-color: #ffffff;
+        border: 1px solid #bcc0c4;
         border-radius: 8px;
         padding: 7px 10px;
+        color: #232629;
         selection-background-color: {accent};
+        selection-color: #ffffff;
     }}
     QLineEdit:focus {{ border: 1px solid {accent}; }}
 
     /* lists (category list, live list) */
     QListWidget {{
-        background-color: #1a1a23;
-        border: 1px solid #26263180;
+        background-color: #ffffff;
+        border: 1px solid #c4c9cd;
         border-radius: 10px;
         padding: 4px;
         outline: 0;
@@ -85,47 +105,59 @@ def build_qss(accent="#3daee9"):
         border-radius: 7px;
         margin: 1px 2px;
     }}
-    QListWidget::item:hover {{ background-color: #25252f; }}
+    QListWidget::item:hover {{ background-color: #e8f2fb; }}
     QListWidget::item:selected {{ background-color: {accent}; color: #ffffff; }}
 
     /* poster grid */
-    QListWidget#Grid {{ background-color: #16161e; border: none; }}
+    QListWidget#Grid {{ background-color: #eff0f1; border: none; }}
     QListWidget#Grid::item {{
         margin: 8px; padding: 6px;
         border-radius: 10px;
-        background-color: #1c1c26;
-        color: #d4d4de;
+        background-color: #ffffff;
+        border: 1px solid #e0e3e6;
+        color: #232629;
     }}
-    QListWidget#Grid::item:hover {{ background-color: #26263a; }}
+    QListWidget#Grid::item:hover {{ background-color: #e8f2fb; border-color: {accent}; }}
     QListWidget#Grid::item:selected {{ background-color: {accent}; color: #ffffff; }}
 
     /* info card */
     QFrame#InfoCard {{
-        background-color: #1b1b25;
-        border: 1px solid #2a2a38;
+        background-color: #f7f8f9;
+        border: 1px solid #d4d7da;
         border-radius: 12px;
     }}
 
     QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
-    QScrollBar::handle:vertical {{ background: #3a3a4a; border-radius: 5px; min-height: 30px; }}
+    QScrollBar::handle:vertical {{ background: #bcc0c4; border-radius: 5px; min-height: 30px; }}
     QScrollBar::handle:vertical:hover {{ background: {accent}; }}
     QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 
-    QSlider::groove:horizontal {{ height: 5px; background: #2c2c3a; border-radius: 3px; }}
+    QSlider::groove:horizontal {{ height: 5px; background: #c4c9cd; border-radius: 3px; }}
     QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 3px; }}
     QSlider::handle:horizontal {{
-        background: #ffffff; width: 14px; height: 14px;
-        margin: -5px 0; border-radius: 7px;
+        background: {accent}; width: 14px; height: 14px;
+        margin: -5px 0; border-radius: 7px; border: 1px solid #ffffff;
     }}
     QProgressBar {{
-        background: #1d1d27; border: none; border-radius: 6px;
-        text-align: center; color: #e6e6ea; height: 18px;
+        background: #d4d7da; border: none; border-radius: 6px;
+        text-align: center; color: #232629; height: 18px;
     }}
     QProgressBar::chunk {{ background-color: {accent}; border-radius: 6px; }}
 
-    QSplitter::handle {{ background: #20202a; }}
+    QSplitter::handle {{ background: #d4d7da; }}
     QComboBox {{
-        background: #1d1d27; border: 1px solid #2f2f3d; border-radius: 8px;
-        padding: 6px 10px;
+        background: #ffffff; border: 1px solid #bcc0c4; border-radius: 8px;
+        padding: 6px 10px; color: #232629;
     }}
+    QComboBox QAbstractItemView {{
+        background: #ffffff; color: #232629;
+        selection-background-color: {accent}; selection-color: #ffffff;
+    }}
+    QTabWidget::pane {{ border: 1px solid #c4c9cd; border-radius: 8px; }}
+    QTabBar::tab {{
+        background: #e4e6e8; color: #232629;
+        padding: 7px 14px; border: 1px solid #c4c9cd;
+        border-top-left-radius: 7px; border-top-right-radius: 7px; margin-right: 2px;
+    }}
+    QTabBar::tab:selected {{ background: #ffffff; border-bottom-color: #ffffff; }}
     """

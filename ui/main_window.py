@@ -2,10 +2,10 @@
 import os
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QListWidget,
-    QListWidgetItem, QLineEdit, QLabel, QSlider, QSplitter, QStyle, QMessageBox,
-    QProgressBar, QFrame, QScrollArea, QSizePolicy,
+    QListWidgetItem, QLineEdit, QLabel, QSlider, QSplitter, QMessageBox,
+    QProgressBar, QFrame, QScrollArea, QSizePolicy, QStackedWidget, QComboBox,
 )
-from PySide6.QtCore import Qt, QThread, Signal, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QTimer, QEvent
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
 
 from iptv import config
@@ -13,6 +13,10 @@ from iptv.mpv_widget import MpvWidget
 from iptv.downloader import DownloadManager
 from iptv.image_loader import ImageLoader
 from ui.style import build_qss, desktop_accent
+from ui.sources_dialog import SourcesDialog
+from media.library_db import LibraryDB
+from media.metadata import MetadataProvider
+from media.local_scanner import LibraryScanner
 
 ROLE = Qt.UserRole
 POSTER = QSize(132, 198)
@@ -30,6 +34,22 @@ class Worker(QThread):
             self.done.emit(self._fn())
         except Exception as e:
             self.done.emit(e)
+
+
+class SeekSlider(QSlider):
+    """Horizontal slider that jumps to the clicked position (click-to-seek)
+    instead of stepping a page, then emits sliderReleased to trigger the seek."""
+
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.LeftButton and self.maximum() > self.minimum():
+            x = ev.position().x() if hasattr(ev, "position") else ev.x()
+            span = self.maximum() - self.minimum()
+            val = self.minimum() + round(span * max(0.0, min(1.0, x / max(1, self.width()))))
+            self.setValue(int(val))
+            ev.accept()
+            self.sliderReleased.emit()
+            return
+        super().mousePressEvent(ev)
 
 
 class MainWindow(QMainWindow):
@@ -51,6 +71,13 @@ class MainWindow(QMainWindow):
         self.downloads.finished_ok.connect(self._on_dl_done)
         self.downloads.failed.connect(self._on_dl_failed)
 
+        # media-center backend: local library DB + metadata + scanner
+        self.db = LibraryDB()
+        mc = config.media_config()
+        self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"))
+        self.scanner = LibraryScanner(self.db, self.meta)
+        self._scanning = False
+
         self.accent = desktop_accent()
         self.setStyleSheet(build_qss(self.accent))
         self.setWindowTitle(f"QPlayer — {profile['name']}")
@@ -62,16 +89,13 @@ class MainWindow(QMainWindow):
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
-        outer = QHBoxLayout(central)
+        outer = QVBoxLayout(central)
         outer.setContentsMargins(8, 8, 8, 8)
-        self.splitter = QSplitter(Qt.Horizontal)
-        outer.addWidget(self.splitter)
 
-        # --- left: nav + categories ---
-        self.left = QWidget()
-        lv = QVBoxLayout(self.left)
-        lv.setContentsMargins(4, 4, 4, 4)
-        nav = QHBoxLayout()
+        # Navigation stays visible; the selections themselves are separate pages.
+        self.nav_bar = QWidget()
+        nav = QHBoxLayout(self.nav_bar)
+        nav.setContentsMargins(4, 4, 4, 4)
         self.btn_live = QPushButton("📺 Live")
         self.btn_vod = QPushButton("🎬 Movies")
         self.btn_series = QPushButton("📺 Series")
@@ -79,7 +103,22 @@ class MainWindow(QMainWindow):
             b.setCheckable(True)
             b.clicked.connect(lambda _=False, mm=m: self._set_mode(mm))
             nav.addWidget(b)
-        lv.addLayout(nav)
+        self.btn_library = QPushButton("📚 Library"); self.btn_library.setCheckable(True)
+        self.btn_library.clicked.connect(self._show_library)
+        nav.addWidget(self.btn_library)
+        nav.addStretch()
+        self.btn_sources = QPushButton("⚙ Sources")
+        self.btn_sources.clicked.connect(self._open_sources)
+        nav.addWidget(self.btn_sources)
+        outer.addWidget(self.nav_bar)
+
+        self.pages = QStackedWidget()
+        outer.addWidget(self.pages, 1)
+
+        # --- categories page ---
+        self.left = QWidget()
+        lv = QVBoxLayout(self.left)
+        lv.setContentsMargins(4, 4, 4, 4)
         hdr = QLabel("Categories"); hdr.setObjectName("Header")
         lv.addWidget(hdr)
         self.cat_search = QLineEdit(); self.cat_search.setPlaceholderText("Filter categories…")
@@ -88,14 +127,20 @@ class MainWindow(QMainWindow):
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._on_category)
         lv.addWidget(self.cat_list)
-        self.splitter.addWidget(self.left)
+        self.pages.addWidget(self.left)
 
-        # --- center: content (poster grid / list) ---
+        # --- content page (poster grid / list) ---
         self.center = QWidget()
         cv = QVBoxLayout(self.center)
         cv.setContentsMargins(4, 4, 4, 4)
+        content_top = QHBoxLayout()
+        self.btn_categories = QPushButton("←  Categories")
+        self.btn_categories.clicked.connect(self._content_back)
+        content_top.addWidget(self.btn_categories)
         self.content_header = QLabel("Content"); self.content_header.setObjectName("Header")
-        cv.addWidget(self.content_header)
+        content_top.addWidget(self.content_header)
+        content_top.addStretch()
+        cv.addLayout(content_top)
         self.content_search = QLineEdit(); self.content_search.setPlaceholderText("Search…")
         self.content_search.textChanged.connect(lambda t: self._filter(self.content_list, t))
         cv.addWidget(self.content_search)
@@ -105,9 +150,16 @@ class MainWindow(QMainWindow):
         self.content_list.currentItemChanged.connect(self._on_content_selected)
         self.content_list.itemActivated.connect(self._on_content_activated)
         cv.addWidget(self.content_list)
-        self.splitter.addWidget(self.center)
+        self.pages.addWidget(self.center)
 
-        # --- right: info card (top) + player (bottom) ---
+        # --- watch page: info card (top) + player (bottom) ---
+        self.watch_page = QWidget()
+        watch_layout = QVBoxLayout(self.watch_page)
+        watch_layout.setContentsMargins(4, 4, 4, 4)
+        self.watch_layout = watch_layout
+        self.btn_content = QPushButton("←  Content")
+        self.btn_content.clicked.connect(self._on_back)
+        watch_layout.addWidget(self.btn_content, 0, Qt.AlignLeft)
         self.right = QSplitter(Qt.Vertical)
         self.info_card = self._build_info_card()
         self.right.addWidget(self.info_card)
@@ -117,14 +169,23 @@ class MainWindow(QMainWindow):
         pv.setContentsMargins(0, 0, 0, 0)
         self.player = MpvWidget()
         self.player.setMinimumHeight(220)
+        self.player.setMouseTracking(True)       # get MouseMove without a pressed button
         self.player.position_changed.connect(self._on_position)
         self.player.duration_changed.connect(self._on_duration)
         self.player.pause_changed.connect(self._on_pause_changed)
         self.player.installEventFilter(self)
         self.player.info_changed.connect(self._on_player_info)
         pv.addWidget(self.player, 1)
+        # Controls overlay the video (pinned to the bottom of the player surface),
+        # so they can fade away in fullscreen and re-appear on mouse movement.
         self.controls_bar = self._build_controls()
-        pv.addWidget(self.controls_bar)
+        self.controls_bar.setParent(self.player)
+        self.controls_bar.setMouseTracking(True)
+        self.controls_bar.installEventFilter(self)
+        self._controls_timer = QTimer(self)
+        self._controls_timer.setSingleShot(True)
+        self._controls_timer.setInterval(2500)
+        self._controls_timer.timeout.connect(self._hide_controls)
         self.dl_row = QWidget(); self.dl_row.setVisible(False)
         dl_h = QHBoxLayout(self.dl_row); dl_h.setContentsMargins(0, 0, 0, 0)
         self.dl_bar = QProgressBar()
@@ -136,10 +197,18 @@ class MainWindow(QMainWindow):
         self._base_title = f"QPlayer — {self.profile['name']}"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
-        self.splitter.addWidget(self.right)
+        watch_layout.addWidget(self.right, 1)
+        self.pages.addWidget(self.watch_page)
 
-        self.splitter.setSizes([240, 540, 540])
+        # --- library page: scanned local/network media as a poster grid ---
+        self.library_page = self._build_library_page()
+        self.pages.addWidget(self.library_page)
+
         self._duration = 0
+        self._current_key = None
+        self._current_title = ""
+        self._resume_target = 0.0
+        self._last_save = 0.0
         self.player.set_volume(self.vol.value())
 
         QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self._exit_fullscreen)
@@ -151,7 +220,7 @@ class MainWindow(QMainWindow):
         self.info_poster = QLabel()
         self.info_poster.setFixedSize(150, 225)
         self.info_poster.setScaledContents(True)
-        self.info_poster.setStyleSheet("border-radius:8px; background:#111118;")
+        self.info_poster.setStyleSheet("border-radius:8px; background:#e0e3e6;")
         h.addWidget(self.info_poster)
 
         right = QVBoxLayout()
@@ -181,15 +250,130 @@ class MainWindow(QMainWindow):
         h.addLayout(right, 1)
         return card
 
+    # ---- library (own scanned media) ----------------------------------
+    def _build_library_page(self):
+        page = QWidget()
+        v = QVBoxLayout(page); v.setContentsMargins(4, 4, 4, 4)
+        top = QHBoxLayout()
+        self.lib_header = QLabel("Library"); self.lib_header.setObjectName("Header")
+        top.addWidget(self.lib_header)
+        top.addStretch()
+        self.lib_kind = QComboBox()
+        self.lib_kind.addItem("🎬 Movies", "movie")
+        self.lib_kind.addItem("📺 TV", "episode")
+        self.lib_kind.addItem("🎵 Music", "music")
+        self.lib_kind.addItem("🖼 Photos", "photo")
+        self.lib_kind.currentIndexChanged.connect(self._populate_library)
+        top.addWidget(self.lib_kind)
+        self.btn_scan = QPushButton("↻ Scan"); self.btn_scan.clicked.connect(self._start_scan)
+        top.addWidget(self.btn_scan)
+        v.addLayout(top)
+        self.lib_search = QLineEdit(); self.lib_search.setPlaceholderText("Filter library…")
+        self.lib_search.textChanged.connect(lambda t: self._filter(self.lib_list, t))
+        v.addWidget(self.lib_search)
+        self.lib_list = QListWidget(); self.lib_list.setObjectName("Grid")
+        self.lib_list.setViewMode(QListWidget.IconMode)
+        self.lib_list.setIconSize(POSTER)
+        self.lib_list.setGridSize(QSize(POSTER.width() + 24, POSTER.height() + 52))
+        self.lib_list.setResizeMode(QListWidget.Adjust)
+        self.lib_list.setMovement(QListWidget.Static)
+        self.lib_list.setUniformItemSizes(True)
+        self.lib_list.setWordWrap(True)
+        self.lib_list.itemActivated.connect(self._on_library_activated)
+        v.addWidget(self.lib_list, 1)
+        return page
+
+    def _show_library(self):
+        for b in (self.btn_live, self.btn_vod, self.btn_series):
+            b.setChecked(False)
+        self.btn_library.setChecked(True)
+        self.pages.setCurrentWidget(self.library_page)
+        self._populate_library()
+
+    def _populate_library(self):
+        kind = self.lib_kind.currentData()
+        items = self.db.media(kind=kind, order="recent")
+        self.lib_list.clear()
+        self.lib_header.setText(f"Library — {len(items)} items")
+        for d in items:
+            label = d.get("title") or "?"
+            if d.get("year"):
+                label += f"  ({d['year']})"
+            if d.get("rating"):
+                label += f"  ⭐{d['rating']:.1f}"
+            it = QListWidgetItem(label)
+            it.setData(ROLE, d)
+            it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
+            it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
+            poster = d.get("poster")
+            if poster:
+                if poster.startswith(("http://", "https://")):
+                    self._load_poster(it, poster)
+                elif os.path.exists(poster):
+                    it.setIcon(QIcon(QPixmap(poster)))
+            self.lib_list.addItem(it)
+
+    def _on_library_activated(self, item):
+        if not item:
+            return
+        d = item.data(ROLE)
+        if d.get("kind") == "photo":
+            return  # photo viewer comes later
+        self._play(d.get("path"), d.get("title"), item_key=d.get("item_key"))
+
+    def _open_sources(self):
+        dlg = SourcesDialog(self)
+        dlg.exec()
+        # apply possibly-changed metadata keys live
+        mc = config.media_config()
+        self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"))
+        self.scanner = LibraryScanner(self.db, self.meta)
+        if dlg.scan_requested:
+            self._start_scan()
+
+    def _start_scan(self):
+        if self._scanning:
+            return
+        paths = config.media_config().get("library_paths", [])
+        if not paths:
+            QMessageBox.information(self, "No folders",
+                                   "Add folders first via ⚙ Sources → Folders.")
+            return
+        self._scanning = True
+        self.lib_header.setText("Scanning…")
+        self.btn_scan.setEnabled(False)
+        worker = Worker(lambda: self.scanner.scan(paths), self)
+        worker.done.connect(self._on_scan_done)
+        worker.done.connect(lambda _=None, w=worker:
+                            self._workers.remove(w) if w in self._workers else None)
+        self._workers.append(worker)
+        worker.start()
+
+    def _on_scan_done(self, result):
+        self._scanning = False
+        self.btn_scan.setEnabled(True)
+        if isinstance(result, Exception):
+            QMessageBox.warning(self, "Scan failed", str(result))
+        self._populate_library()
+
     def _build_controls(self):
         bar = QWidget()
+        bar.setObjectName("ControlsBar")
         ctl = QHBoxLayout(bar)
-        ctl.setContentsMargins(4, 2, 4, 2)
-        self.btn_play = QPushButton()
-        self.btn_play.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
-        self.btn_play.clicked.connect(self.player.toggle_pause)
-        ctl.addWidget(self.btn_play)
-        self.pos_slider = QSlider(Qt.Horizontal); self.pos_slider.setRange(0, 1000)
+        ctl.setContentsMargins(8, 4, 8, 4)
+        # Three separate transport buttons (play / pause / stop) with glyph labels
+        # — standardIcon themes render invisibly on the dark buttons.
+        self.btn_play = QPushButton("▶"); self.btn_play.setObjectName("Transport")
+        self.btn_play.setToolTip("Play")
+        self.btn_play.clicked.connect(lambda: self.player.set_pause(False))
+        self.btn_pause = QPushButton("⏸"); self.btn_pause.setObjectName("Transport")
+        self.btn_pause.setToolTip("Pause")
+        self.btn_pause.clicked.connect(lambda: self.player.set_pause(True))
+        self.btn_stop = QPushButton("⏹"); self.btn_stop.setObjectName("Transport")
+        self.btn_stop.setToolTip("Stop")
+        self.btn_stop.clicked.connect(self._stop_playback)
+        ctl.addWidget(self.btn_play); ctl.addWidget(self.btn_pause); ctl.addWidget(self.btn_stop)
+        self.pos_slider = SeekSlider(Qt.Horizontal); self.pos_slider.setRange(0, 1000)
         self.pos_slider.sliderReleased.connect(self._seek)
         ctl.addWidget(self.pos_slider, 1)
         self.time_lbl = QLabel("00:00 / 00:00"); self.time_lbl.setObjectName("Meta")
@@ -208,6 +392,7 @@ class MainWindow(QMainWindow):
     def _set_mode(self, mode):
         self.mode = mode
         self.viewing_series = None
+        self.btn_library.setChecked(False)
         for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
             b.setChecked(m == mode)
         grid = mode in ("vod", "series")
@@ -218,6 +403,7 @@ class MainWindow(QMainWindow):
         self.content_list.setMovement(QListWidget.Static)
         self.btn_dl_info.setEnabled(mode in ("vod", "series"))
         self.cat_list.clear(); self.content_list.clear()
+        self.pages.setCurrentWidget(self.left)
         self.content_header.setText("Loading categories…")
         fetch = {"live": self.client.live_categories,
                  "vod": self.client.vod_categories,
@@ -241,6 +427,7 @@ class MainWindow(QMainWindow):
         self.viewing_series = None
         self.content_list.clear()
         self.content_header.setText("Loading…")
+        self.pages.setCurrentWidget(self.center)
         cid = self.category_id
         fn = {"live": lambda: self.client.live_streams(cid),
               "vod": lambda: self.client.vod_streams(cid),
@@ -290,6 +477,7 @@ class MainWindow(QMainWindow):
             url = d.get("stream_icon")
             if url:
                 self.images.load(url, lambda pm: self.info_poster.setPixmap(pm))
+            self.pages.setCurrentWidget(self.watch_page)
             return
         name = d.get("name") or d.get("title") or "?"
         self.info_title.setText(name)
@@ -305,6 +493,7 @@ class MainWindow(QMainWindow):
             sid = d.get("stream_id")
             self._run(lambda: self.client.vod_info(sid),
                       lambda info, n=name: self._fill_vod_info(info, n))
+        self.pages.setCurrentWidget(self.watch_page)
 
     @staticmethod
     def _meta_from(d):
@@ -343,9 +532,11 @@ class MainWindow(QMainWindow):
         d = item.data(ROLE)
         if self.mode == "live":
             self._play(self.client.live_url(d.get("stream_id")), d.get("name"))
+            self.pages.setCurrentWidget(self.watch_page)
         elif self.mode == "vod":
             ext = d.get("container_extension") or "mp4"
             self._play(self.client.movie_url(d.get("stream_id"), ext), d.get("name"))
+            self.pages.setCurrentWidget(self.watch_page)
         elif self.mode == "series":
             if d == "__back__":
                 self._on_category(self.cat_list.currentItem())
@@ -354,21 +545,30 @@ class MainWindow(QMainWindow):
             else:
                 ext = d.get("container_extension") or "mp4"
                 self._play(self.client.series_url(d.get("id"), ext), d.get("title"))
+                self.pages.setCurrentWidget(self.watch_page)
 
-    def _on_back(self):
-        # Series episodes -> back to the series list; otherwise stop & reset.
+    def _show_categories(self):
+        self.pages.setCurrentWidget(self.left)
+
+    def _show_content(self):
+        self.pages.setCurrentWidget(self.center)
+
+    def _content_back(self):
         if self.mode == "series" and self.viewing_series is not None:
             self.viewing_series = None
             self._on_category(self.cat_list.currentItem())
-            return
+        else:
+            self._show_categories()
+
+    def _on_back(self):
         self.player.stop()
+        self._current_key = None
         self.setWindowTitle(self._base_title)
-        self.info_title.setText("Select something to watch")
-        self.info_meta.setText(""); self.info_plot.setText("")
-        self.info_poster.clear()
+        self._show_content()
 
     def _open_series(self, series):
         self.viewing_series = series
+        self.pages.setCurrentWidget(self.center)
         self.content_header.setText("Loading episodes…")
         self.content_list.clear()
         self.content_list.setViewMode(QListWidget.ListMode)
@@ -394,13 +594,23 @@ class MainWindow(QMainWindow):
         self.content_header.setText(f"{nm} — {count} episodes")
 
     # ---- playback ------------------------------------------------------
-    def _play(self, url, title=None):
+    def _play(self, url, title=None, item_key=None):
+        if not url:
+            return
+        self.pages.setCurrentWidget(self.watch_page)
         if title:
             self._base_title = f"QPlayer — {title}"
             self.setWindowTitle(self._base_title)
         self._duration = 0
+        self._current_key = item_key
+        self._current_title = title or ""
+        self._last_save = 0.0
+        # Resume from the saved position once the duration is known.
+        pos, _dur = self.db.get_progress(item_key) if item_key else (0.0, 0.0)
+        self._resume_target = pos if pos > 5 else 0.0
         self.pos_slider.setValue(0)
         self.player.play(url)
+        self._show_controls()
 
     # ---- download ------------------------------------------------------
     def _download_selected(self):
@@ -446,13 +656,23 @@ class MainWindow(QMainWindow):
         if self._duration > 0 and not self.pos_slider.isSliderDown():
             self.pos_slider.setValue(int(pos / self._duration * 1000))
         self.time_lbl.setText(f"{self._fmt(pos)} / {self._fmt(self._duration)}")
+        # Persist resume position every few seconds for "Continue Watching".
+        if self._current_key and self._duration > 0 and pos - self._last_save >= 5:
+            self._last_save = pos
+            self.db.save_progress(self._current_key, pos, self._duration,
+                                  title=self._current_title, kind="movie")
 
     def _on_duration(self, dur):
         self._duration = dur or 0
+        # Apply a pending resume seek now that the media length is known.
+        if self._resume_target and self._duration > 0:
+            self.player.seek(self._resume_target)
+            self._resume_target = 0.0
 
     def _on_pause_changed(self, paused):
-        icon = QStyle.SP_MediaPlay if paused else QStyle.SP_MediaPause
-        self.btn_play.setIcon(self.style().standardIcon(icon))
+        # Grey out the button matching the current state so it's obvious what's active.
+        self.btn_play.setEnabled(paused)
+        self.btn_pause.setEnabled(not paused)
 
     def _on_player_info(self, info):
         # show decoder + resolution in the title so HW decode is verifiable
@@ -467,34 +687,77 @@ class MainWindow(QMainWindow):
         self.settings["volume"] = v
         config.save_settings(self.settings)
 
+    def _stop_playback(self):
+        self.player.stop()
+        self.pos_slider.setValue(0)
+        self.time_lbl.setText("00:00 / 00:00")
+        if self._fs:
+            self._exit_fullscreen()
+        self._on_back()
+
+    # ---- controls overlay ----------------------------------------------
+    def _position_controls(self):
+        """Pin the controls bar to the bottom of the video surface."""
+        h = self.controls_bar.sizeHint().height()
+        self.controls_bar.setGeometry(0, max(0, self.player.height() - h),
+                                      self.player.width(), h)
+
+    def _show_controls(self):
+        self._position_controls()
+        self.controls_bar.show()
+        self.controls_bar.raise_()
+        self.player.unsetCursor()
+
+    def _hide_controls(self):
+        # Only auto-hide in fullscreen, and never while the pointer is on the bar.
+        if self._fs and not self.controls_bar.underMouse():
+            self.controls_bar.hide()
+            self.player.setCursor(Qt.BlankCursor)
+
+    def _wake_controls(self):
+        """Mouse moved over the video: reveal controls, then arm the hide timer."""
+        self._show_controls()
+        if self._fs:
+            self._controls_timer.start()
+
     # ---- fullscreen ----------------------------------------------------
     def _toggle_fullscreen(self):
         self._exit_fullscreen() if self._fs else self._enter_fullscreen()
 
     def _enter_fullscreen(self):
         self._fs = True
-        self.left.hide(); self.center.hide(); self.info_card.hide()
-        self.controls_bar.hide()
+        self.pages.setCurrentWidget(self.watch_page)
+        self.nav_bar.hide(); self.btn_content.hide(); self.info_card.hide()
         self.centralWidget().layout().setContentsMargins(0, 0, 0, 0)
-        self.splitter.setHandleWidth(0)
+        self.watch_layout.setContentsMargins(0, 0, 0, 0)
         self.right.setHandleWidth(0)
         self.showFullScreen()
+        self._wake_controls()          # show briefly, then auto-hide
 
     def _exit_fullscreen(self):
         if not self._fs:
             return
         self._fs = False
-        self.left.show(); self.center.show(); self.info_card.show()
-        self.controls_bar.show()
+        self._controls_timer.stop()
+        self.nav_bar.show(); self.btn_content.show(); self.info_card.show()
         self.centralWidget().layout().setContentsMargins(8, 8, 8, 8)
-        self.splitter.setHandleWidth(5)
+        self.watch_layout.setContentsMargins(4, 4, 4, 4)
         self.right.setHandleWidth(5)
         self.showNormal()
+        self._show_controls()          # always visible in windowed mode
 
     def eventFilter(self, obj, ev):
-        from PySide6.QtCore import QEvent
-        if obj is self.player and ev.type() == QEvent.MouseButtonDblClick:
-            self._toggle_fullscreen(); return True
+        if obj is self.player:
+            if ev.type() == QEvent.MouseButtonDblClick:
+                self._toggle_fullscreen(); return True
+            if ev.type() == QEvent.Resize:
+                self._position_controls()
+            elif ev.type() == QEvent.MouseMove:
+                self._wake_controls()
+        elif obj is self.controls_bar and ev.type() == QEvent.MouseMove:
+            # keep the bar alive while the pointer hovers over it
+            if self._fs:
+                self._controls_timer.start()
         return super().eventFilter(obj, ev)
 
     @staticmethod
@@ -521,4 +784,5 @@ class MainWindow(QMainWindow):
         for w in list(self._workers):
             w.wait(3000)
         self.player.shutdown()
+        self.db.close()
         super().closeEvent(ev)

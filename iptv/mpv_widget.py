@@ -142,8 +142,10 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.pause = paused
 
     def seek(self, seconds, reference="absolute"):
+        # Use the 2-arg form ('seek <target> <flags>'); python-mpv's seek()
+        # appends a precision arg that mpv rejects, so the seek silently fails.
         try:
-            self._mpv.seek(seconds, reference)
+            self._mpv.command("seek", seconds, reference)
         except Exception:
             pass
 
