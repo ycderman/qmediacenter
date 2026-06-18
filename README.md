@@ -16,6 +16,15 @@ with posters and **IMDb ratings**.
   metadata API keys — nothing is hard-coded.
 - KDE Breeze Light theme; accent follows the desktop.
 
+## Screenshots
+
+| Home | Library | Sources |
+|------|---------|---------|
+| ![Home](docs/screenshots/home.png) | ![Library](docs/screenshots/library.png) | ![Sources](docs/screenshots/sources.png) |
+
+A rowed home screen (Continue Watching / Favorites / Recently Added), a poster
+library scanned from your folders, and an in-app Sources menu to add everything.
+
 ## Architecture
 
 ```
