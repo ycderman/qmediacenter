@@ -18,9 +18,11 @@ with posters and **IMDb ratings**.
 
 ## Screenshots
 
-| Home | Library | Sources |
-|------|---------|---------|
-| ![Home](docs/screenshots/home.png) | ![Library](docs/screenshots/library.png) | ![Sources](docs/screenshots/sources.png) |
+| Home | Library |
+|------|---------|
+| ![Home](docs/screenshots/home.png) | ![Library](docs/screenshots/library.png) |
+| **Detail** | **Sources** |
+| ![Detail](docs/screenshots/detail.png) | ![Sources](docs/screenshots/sources.png) |
 
 A rowed home screen (Continue Watching / Favorites / Recently Added), a poster
 library scanned from your folders, and an in-app Sources menu to add everything.
