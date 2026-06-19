@@ -214,6 +214,12 @@ class MainWindow(QMainWindow):
         self.home_page = self._build_home_page()
         self.pages.addWidget(self.home_page)
 
+        # --- detail page: info card for a library/home item, with Play ---
+        self.detail_page = self._build_detail_page()
+        self.pages.addWidget(self.detail_page)
+        self._detail_item = None
+        self._detail_return = self.home_page
+
         self._duration = 0
         self._current_key = None
         self._current_title = ""
@@ -292,7 +298,8 @@ class MainWindow(QMainWindow):
         self.lib_list.setMovement(QListWidget.Static)
         self.lib_list.setUniformItemSizes(True)
         self.lib_list.setWordWrap(True)
-        self.lib_list.itemActivated.connect(self._on_library_activated)
+        self.lib_list.itemClicked.connect(self._show_detail)        # single click -> info
+        self.lib_list.itemActivated.connect(self._on_library_activated)  # double click -> play
         v.addWidget(self.lib_list, 1)
         return page
 
@@ -458,7 +465,7 @@ class MainWindow(QMainWindow):
             elif poster and os.path.exists(poster):
                 it.setIcon(QIcon(QPixmap(poster)))
             strip.addItem(it)
-        strip.itemClicked.connect(lambda i: self._play_item(i.data(ROLE)))
+        strip.itemClicked.connect(self._show_detail)        # single click -> info card
         v.addWidget(strip)
         return box
 
@@ -732,6 +739,88 @@ class MainWindow(QMainWindow):
             url = key[len("local:"):]
         self._play(url, d.get("title"), item_key=key or None,
                    poster=d.get("poster", ""), kind=d.get("kind", "movie"))
+
+    # ---- detail view (info card for library/home items) ----------------
+    def _build_detail_page(self):
+        page = QWidget()
+        v = QVBoxLayout(page); v.setContentsMargins(8, 8, 8, 8)
+        top = QHBoxLayout()
+        back = QPushButton("←  Back"); back.clicked.connect(self._detail_back)
+        top.addWidget(back); top.addStretch()
+        v.addLayout(top)
+        card = QFrame(); card.setObjectName("InfoCard")
+        h = QHBoxLayout(card)
+        self.detail_poster = QLabel(); self.detail_poster.setFixedSize(260, 390)
+        self.detail_poster.setScaledContents(True)
+        self.detail_poster.setStyleSheet("border-radius:8px; background:#e0e3e6;")
+        h.addWidget(self.detail_poster)
+        right = QVBoxLayout()
+        self.detail_title = QLabel(); self.detail_title.setObjectName("Title")
+        self.detail_title.setWordWrap(True)
+        right.addWidget(self.detail_title)
+        self.detail_meta = QLabel(); self.detail_meta.setObjectName("Meta")
+        self.detail_meta.setWordWrap(True)
+        right.addWidget(self.detail_meta)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.NoFrame)
+        self.detail_plot = QLabel(); self.detail_plot.setObjectName("Plot")
+        self.detail_plot.setWordWrap(True); self.detail_plot.setAlignment(Qt.AlignTop)
+        scroll.setWidget(self.detail_plot)
+        right.addWidget(scroll, 1)
+        btns = QHBoxLayout()
+        self.btn_detail_play = QPushButton("▶  Play")
+        self.btn_detail_play.clicked.connect(lambda: self._play_item(self._detail_item))
+        self.btn_detail_fav = QPushButton("⭐ Favorite")
+        self.btn_detail_fav.clicked.connect(self._toggle_detail_fav)
+        btns.addWidget(self.btn_detail_play); btns.addWidget(self.btn_detail_fav)
+        btns.addStretch()
+        right.addLayout(btns)
+        h.addLayout(right, 1)
+        v.addWidget(card, 1)
+        return page
+
+    def _show_detail(self, item):
+        d = item.data(ROLE) if item else None
+        if not d:
+            return
+        self._detail_item = d
+        self.detail_title.setText(d.get("title", "?"))
+        meta = []
+        if d.get("year"):
+            meta.append(str(d["year"]))
+        if d.get("rating"):
+            meta.append(f"⭐ {d['rating']:.1f} IMDb")
+        genres = d.get("genres") or []
+        if isinstance(genres, list) and genres:
+            meta.append(", ".join(genres))
+        extra = d.get("extra") or {}
+        if extra.get("season") and extra.get("episode"):
+            meta.append(f"S{extra['season']:02d}E{extra['episode']:02d}")
+        self.detail_meta.setText("   ·   ".join(meta))
+        self.detail_plot.setText(d.get("overview") or "No description available.")
+        key = d.get("item_key", "")
+        fav = self.db.is_favorite(key) if key else False
+        self.btn_detail_fav.setText("★ Favorited" if fav else "⭐ Favorite")
+        self.detail_poster.clear()
+        poster = d.get("poster")
+        if poster and poster.startswith(("http://", "https://")):
+            self.images.load(poster, lambda pm: self.detail_poster.setPixmap(pm))
+        elif poster and os.path.exists(poster):
+            self.detail_poster.setPixmap(QPixmap(poster))
+        self._detail_return = self.pages.currentWidget()
+        self.pages.setCurrentWidget(self.detail_page)
+
+    def _detail_back(self):
+        self.pages.setCurrentWidget(self._detail_return or self.home_page)
+
+    def _toggle_detail_fav(self):
+        d = self._detail_item
+        if not d or not d.get("item_key"):
+            return
+        now = self.db.toggle_favorite(
+            d["item_key"], source=d.get("source", "local"), title=d.get("title", ""),
+            kind=d.get("kind", "movie"), poster=d.get("poster", ""),
+            extra={"url": d.get("path") or (d.get("extra") or {}).get("url", "")})
+        self.btn_detail_fav.setText("★ Favorited" if now else "⭐ Favorite")
 
     # ---- download ------------------------------------------------------
     def _download_selected(self):

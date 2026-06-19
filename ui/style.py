@@ -143,7 +143,11 @@ def build_qss(accent="#3daee9"):
     QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
     QScrollBar::handle:vertical {{ background: #bcc0c4; border-radius: 5px; min-height: 30px; }}
     QScrollBar::handle:vertical:hover {{ background: {accent}; }}
-    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+    QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
+    QScrollBar::handle:horizontal {{ background: #bcc0c4; border-radius: 5px; min-width: 30px; }}
+    QScrollBar::handle:horizontal:hover {{ background: {accent}; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 
     QSlider::groove:horizontal {{ height: 5px; background: #c4c9cd; border-radius: 3px; }}
     QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 3px; }}
