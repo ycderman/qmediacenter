@@ -159,9 +159,14 @@ class SourcesDialog(QDialog):
         links = QLabel(
             'Free keys: <a href="https://www.themoviedb.org/settings/api">TMDb</a> '
             '(posters + metadata) · '
-            '<a href="https://www.omdbapi.com/apikey.aspx">OMDb</a> (IMDb rating)')
+            '<a href="https://www.omdbapi.com/apikey.aspx">OMDb</a> (IMDb rating, optional)')
         links.setObjectName("Meta"); links.setOpenExternalLinks(True); links.setWordWrap(True)
         v.addWidget(links)
+        note = QLabel("⭐ IMDb ratings come from the official IMDb dataset "
+                      "(no key, downloaded automatically on the first library scan "
+                      "when a TMDb key is set). OMDb is only a fallback.")
+        note.setObjectName("Meta"); note.setWordWrap(True)
+        v.addWidget(note)
         v.addStretch()
         return w
 

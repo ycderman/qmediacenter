@@ -23,10 +23,11 @@ _CACHE_AGE = 60 * 60 * 24 * 30  # 30 days
 
 
 class MetadataProvider:
-    def __init__(self, db, tmdb_key="", omdb_key=""):
+    def __init__(self, db, tmdb_key="", omdb_key="", imdb=None):
         self._db = db
         self._tmdb = (tmdb_key or "").strip()
         self._omdb = (omdb_key or "").strip()
+        self._imdb = imdb            # optional ImdbRatings (official dataset)
 
     @property
     def enabled(self):
@@ -48,11 +49,17 @@ class MetadataProvider:
         result = {}
         if self._tmdb:
             result = self._tmdb_lookup(title, year, kind)
-        # Fill the real IMDb rating from OMDb when we have an imdb id or title.
-        if self._omdb:
-            rating = self._omdb_rating(result.get("imdb_id"), title, year)
-            if rating is not None:
-                result["rating"] = rating
+        imdb_id = result.get("imdb_id")
+        # Real IMDb rating: prefer the official IMDb dataset (keyed by imdb id),
+        # fall back to OMDb (by imdb id or title+year).
+        if self._imdb is not None and imdb_id:
+            r = self._imdb.rating(imdb_id)
+            if r is not None:
+                result["rating"] = r
+        elif self._omdb:
+            r = self._omdb_rating(imdb_id, title, year)
+            if r is not None:
+                result["rating"] = r
 
         self._db.cache_put(key, result)
         return result

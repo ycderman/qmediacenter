@@ -17,6 +17,7 @@ from ui.sources_dialog import SourcesDialog
 from media.library_db import LibraryDB
 from media.metadata import MetadataProvider
 from media.local_scanner import LibraryScanner
+from media.imdb_ratings import ImdbRatings
 
 ROLE = Qt.UserRole
 POSTER = QSize(132, 198)
@@ -73,8 +74,10 @@ class MainWindow(QMainWindow):
 
         # media-center backend: local library DB + metadata + scanner
         self.db = LibraryDB()
+        self.imdb = ImdbRatings()      # official IMDb ratings dataset (downloaded on scan)
         mc = config.media_config()
-        self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"))
+        self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"),
+                                     imdb=self.imdb)
         self.scanner = LibraryScanner(self.db, self.meta)
         self._scanning = False
 
@@ -336,7 +339,8 @@ class MainWindow(QMainWindow):
         dlg.exec()
         # apply possibly-changed metadata keys live
         mc = config.media_config()
-        self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"))
+        self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"),
+                                     imdb=self.imdb)
         self.scanner = LibraryScanner(self.db, self.meta)
         if dlg.scan_requested:
             self._start_scan()
@@ -350,9 +354,18 @@ class MainWindow(QMainWindow):
                                    "Add folders first via ⚙ Sources → Folders.")
             return
         self._scanning = True
-        self.lib_header.setText("Scanning…")
+        # When a TMDb key is set, refresh the official IMDb ratings dataset first
+        # (downloads ~25 MB the first time / weekly), then scan — both off-thread.
+        need_imdb = bool(config.media_config().get("tmdb_key")) and not self.imdb.is_fresh()
+        self.lib_header.setText("Updating IMDb ratings…" if need_imdb else "Scanning…")
         self.btn_scan.setEnabled(False)
-        worker = Worker(lambda: self.scanner.scan(paths), self)
+
+        def job():
+            if need_imdb:
+                self.imdb.ensure()
+            return self.scanner.scan(paths)
+
+        worker = Worker(job, self)
         worker.done.connect(self._on_scan_done)
         worker.done.connect(lambda _=None, w=worker:
                             self._workers.remove(w) if w in self._workers else None)
@@ -896,4 +909,5 @@ class MainWindow(QMainWindow):
             w.wait(3000)
         self.player.shutdown()
         self.db.close()
+        self.imdb.close()
         super().closeEvent(ev)
