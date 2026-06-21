@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         self.mode = "live"
         self.category_id = None
         self.viewing_series = None
+        self._all_streams = {}          # mode -> full catalog (cached for name search)
         self._workers = []
         self._fs = False
 
@@ -128,7 +129,7 @@ class MainWindow(QMainWindow):
         hdr = QLabel("Categories"); hdr.setObjectName("Header")
         lv.addWidget(hdr)
         self.cat_search = QLineEdit(); self.cat_search.setPlaceholderText("Filter categories…")
-        self.cat_search.textChanged.connect(lambda t: self._filter(self.cat_list, t))
+        self.cat_search.textChanged.connect(self._on_cat_search)
         lv.addWidget(self.cat_search)
         self.cat_list = QListWidget()
         self.cat_list.currentItemChanged.connect(self._on_category)
@@ -516,6 +517,12 @@ class MainWindow(QMainWindow):
         self.content_list.setWordWrap(grid)
         self.content_list.setMovement(QListWidget.Static)
         self.btn_dl_info.setEnabled(mode in ("vod", "series"))
+        self.cat_search.blockSignals(True)
+        self.cat_search.clear()
+        self.cat_search.setPlaceholderText(
+            {"vod": "Search movies…", "series": "Search series…"}.get(
+                mode, "Filter categories…"))
+        self.cat_search.blockSignals(False)
         self.cat_list.clear(); self.content_list.clear()
         self.pages.setCurrentWidget(self.left)
         self.content_header.setText("Loading categories…")
@@ -533,6 +540,45 @@ class MainWindow(QMainWindow):
             it.setData(ROLE, c.get("category_id"))
             self.cat_list.addItem(it)
         self.content_header.setText("Select a category")
+
+    # ---- name search (vod/series) -------------------------------------
+    def _on_cat_search(self, text):
+        # Live: keep filtering the category list locally.
+        if self.mode == "live":
+            self._filter(self.cat_list, text)
+            return
+        # VOD/Series: search the whole catalog by movie/series title.
+        text = text.strip()
+        if not text:
+            self.pages.setCurrentWidget(self.left)
+            return
+        cached = self._all_streams.get(self.mode)
+        if cached is not None:
+            self._apply_search(cached, text)
+            return
+        self.content_list.clear()
+        self.content_header.setText("Loading catalog…")
+        self.pages.setCurrentWidget(self.center)
+        fetch = self.client.vod_streams if self.mode == "vod" else self.client.series
+        self._run(fetch, self._cache_and_search)
+
+    def _cache_and_search(self, items):
+        if isinstance(items, Exception) or not items:
+            items = []
+        self._all_streams[self.mode] = items
+        q = self.cat_search.text().strip()
+        if q and self.mode != "live":
+            self._apply_search(items, q)
+
+    def _apply_search(self, items, text):
+        q = text.lower()
+        matched = [d for d in items
+                   if q in (d.get("name") or d.get("title") or "").lower()]
+        self._populate_content(matched)
+        self.content_header.setText(
+            f"{len(matched)} result(s) · “{text}”" if matched
+            else f"No results · “{text}”")
+        self.pages.setCurrentWidget(self.center)
 
     def _on_category(self, item, _prev=None):
         if not item:
