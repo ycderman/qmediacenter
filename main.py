@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """QMediaCenter — a Qt6/libmpv media center (IPTV + local/network library)."""
+import os
 import sys
 import locale
 import logging
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 
 from iptv import config
 from iptv.xtream import XtreamClient
@@ -31,6 +33,12 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("QMediaCenter")
     app.setDesktopFileName("io.github.ycderman.qmediacenter")
+    _here = os.path.dirname(os.path.abspath(__file__))
+    for _cand in ("data/qmediacenter.png", "qmediacenter.png"):
+        _icon = os.path.join(_here, _cand)
+        if os.path.exists(_icon):
+            app.setWindowIcon(QIcon(_icon))
+            break
     # Qt resets LC_NUMERIC from the environment; libmpv requires "C".
     locale.setlocale(locale.LC_NUMERIC, "C")
 

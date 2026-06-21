@@ -25,6 +25,8 @@ win.show()
 
 results = []
 pages = []
+def step0():
+    win._set_mode("live")          # app opens on Home; switch to Live first
 def step1():
     results.append(("live categories", win.cat_list.count()))
     pages.append(("categories page", win.pages.currentWidget() is win.left))
@@ -55,6 +57,6 @@ def step6():
     win.player.shutdown()
     app.quit()
 
-for i, fn in enumerate((step1, step2, step3, step4, step5, step6), 1):
+for i, fn in enumerate((step0, step1, step2, step3, step4, step5, step6), 1):
     QTimer.singleShot(i * 900, fn)
 sys.exit(app.exec())

@@ -29,6 +29,7 @@ class MpvWidget(QOpenGLWidget):
     position_changed = Signal(float)
     pause_changed = Signal(bool)
     info_changed = Signal(str)        # e.g. "vaapi · 3840x2160"
+    tracks_changed = Signal(list)     # list of mpv track-list dicts
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -57,6 +58,7 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.observe_property("duration", self._on_duration)
         self._mpv.observe_property("time-pos", self._on_time_pos)
         self._mpv.observe_property("pause", self._on_pause)
+        self._mpv.observe_property("track-list", self._on_tracks)
 
     # ---- GL lifecycle -------------------------------------------------
     def initializeGL(self):
@@ -101,6 +103,11 @@ class MpvWidget(QOpenGLWidget):
     def _on_pause(self, _name, value):
         if self._alive:
             self.pause_changed.emit(bool(value))
+
+    def _on_tracks(self, _name, value):
+        # Marshalled from mpv's thread; just forward the observed list.
+        if self._alive:
+            self.tracks_changed.emit(list(value) if value else [])
 
     def _on_hwdec(self, _name, value):
         if not self._alive:
@@ -151,6 +158,20 @@ class MpvWidget(QOpenGLWidget):
 
     def set_volume(self, volume: int):
         self._mpv.volume = max(0, min(150, volume))
+
+    def set_audio(self, aid):
+        # aid: an integer track id, or "auto"/"no"
+        try:
+            self._mpv.aid = aid
+        except Exception:
+            pass
+
+    def set_subtitle(self, sid):
+        # sid: an integer track id, or "no" to disable subtitles
+        try:
+            self._mpv.sid = sid
+        except Exception:
+            pass
 
     def shutdown(self):
         # Stop callbacks from touching mpv before we tear it down (avoids SEGV).

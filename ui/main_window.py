@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
 
         self.downloads = DownloadManager(
             self.settings.get("download_dir") or config.download_dir(), self)
+        self.downloads.started.connect(self._on_dl_started)
         self.downloads.progress.connect(self._on_dl_progress)
         self.downloads.finished_ok.connect(self._on_dl_done)
         self.downloads.failed.connect(self._on_dl_failed)
@@ -113,6 +114,9 @@ class MainWindow(QMainWindow):
         self.btn_library = QPushButton("📚 Library"); self.btn_library.setCheckable(True)
         self.btn_library.clicked.connect(self._show_library)
         nav.addWidget(self.btn_library)
+        self.btn_downloads = QPushButton("⬇ Downloads"); self.btn_downloads.setCheckable(True)
+        self.btn_downloads.clicked.connect(self._show_downloads)
+        nav.addWidget(self.btn_downloads)
         nav.addStretch()
         self.btn_sources = QPushButton("⚙ Sources")
         self.btn_sources.clicked.connect(self._open_sources)
@@ -182,6 +186,7 @@ class MainWindow(QMainWindow):
         self.player.pause_changed.connect(self._on_pause_changed)
         self.player.installEventFilter(self)
         self.player.info_changed.connect(self._on_player_info)
+        self.player.tracks_changed.connect(self._on_tracks_changed)
         pv.addWidget(self.player, 1)
         # Controls overlay the video (pinned to the bottom of the player surface),
         # so they can fade away in fullscreen and re-appear on mouse movement.
@@ -193,14 +198,6 @@ class MainWindow(QMainWindow):
         self._controls_timer.setSingleShot(True)
         self._controls_timer.setInterval(2500)
         self._controls_timer.timeout.connect(self._hide_controls)
-        self.dl_row = QWidget(); self.dl_row.setVisible(False)
-        dl_h = QHBoxLayout(self.dl_row); dl_h.setContentsMargins(0, 0, 0, 0)
-        self.dl_bar = QProgressBar()
-        dl_h.addWidget(self.dl_bar, 1)
-        self.btn_dl_stop = QPushButton("⏹  Stop")
-        self.btn_dl_stop.clicked.connect(self.downloads.cancel_all)
-        dl_h.addWidget(self.btn_dl_stop)
-        pv.addWidget(self.dl_row)
         self._base_title = f"QMediaCenter — {self.profile['name']}"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
@@ -220,6 +217,11 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.detail_page)
         self._detail_item = None
         self._detail_return = self.home_page
+
+        # --- downloads page: one row per download with progress + speed ---
+        self._dl_widgets = {}          # id -> {row, bar, speed, status, stop}
+        self.downloads_page = self._build_downloads_page()
+        self.pages.addWidget(self.downloads_page)
 
         self._duration = 0
         self._current_key = None
@@ -305,7 +307,7 @@ class MainWindow(QMainWindow):
         return page
 
     def _show_library(self):
-        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_home):
+        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_home, self.btn_downloads):
             b.setChecked(False)
         self.btn_library.setChecked(True)
         self.pages.setCurrentWidget(self.library_page)
@@ -356,22 +358,29 @@ class MainWindow(QMainWindow):
     def _start_scan(self):
         if self._scanning:
             return
-        paths = config.media_config().get("library_paths", [])
-        if not paths:
-            QMessageBox.information(self, "No folders",
-                                   "Add folders first via ⚙ Sources → Folders.")
+        mc = config.media_config()
+        paths = mc.get("library_paths", [])
+        emby_cfg = mc.get("emby", {})
+        has_emby = bool(emby_cfg.get("url") and emby_cfg.get("api_key"))
+        if not paths and not has_emby:
+            QMessageBox.information(self, "No sources",
+                                   "Add folders or an Emby server first via ⚙ Sources.")
             return
         self._scanning = True
         # When a TMDb key is set, refresh the official IMDb ratings dataset first
         # (downloads ~25 MB the first time / weekly), then scan — both off-thread.
-        need_imdb = bool(config.media_config().get("tmdb_key")) and not self.imdb.is_fresh()
+        need_imdb = bool(mc.get("tmdb_key")) and not self.imdb.is_fresh()
         self.lib_header.setText("Updating IMDb ratings…" if need_imdb else "Scanning…")
         self.btn_scan.setEnabled(False)
 
         def job():
             if need_imdb:
                 self.imdb.ensure()
-            return self.scanner.scan(paths)
+            result = self.scanner.scan(paths) if paths else (0, 0)
+            if has_emby:
+                from media.emby import sync_emby
+                sync_emby(self.db, emby_cfg)   # raises on auth/connection errors
+            return result
 
         worker = Worker(job, self)
         worker.done.connect(self._on_scan_done)
@@ -399,7 +408,7 @@ class MainWindow(QMainWindow):
         return scroll
 
     def _show_home(self):
-        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_library):
+        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_library, self.btn_downloads):
             b.setChecked(False)
         self.btn_home.setChecked(True)
         self.pages.setCurrentWidget(self.home_page)
@@ -492,6 +501,15 @@ class MainWindow(QMainWindow):
         ctl.addWidget(self.pos_slider, 1)
         self.time_lbl = QLabel("00:00 / 00:00"); self.time_lbl.setObjectName("Meta")
         ctl.addWidget(self.time_lbl)
+        # Audio + subtitle track pickers (populated from mpv's track-list).
+        self.audio_combo = QComboBox(); self.audio_combo.setToolTip("Audio track")
+        self.audio_combo.setMaximumWidth(150)
+        self.audio_combo.activated.connect(self._on_audio_pick)
+        ctl.addWidget(QLabel("🔉")); ctl.addWidget(self.audio_combo)
+        self.sub_combo = QComboBox(); self.sub_combo.setToolTip("Subtitles")
+        self.sub_combo.setMaximumWidth(150)
+        self.sub_combo.activated.connect(self._on_sub_pick)
+        ctl.addWidget(QLabel("💬")); ctl.addWidget(self.sub_combo)
         vlbl = QLabel("🔊"); ctl.addWidget(vlbl)
         self.vol = QSlider(Qt.Horizontal); self.vol.setRange(0, 150); self.vol.setFixedWidth(110)
         self.vol.setValue(self.settings.get("volume", 100))
@@ -508,6 +526,7 @@ class MainWindow(QMainWindow):
         self.viewing_series = None
         self.btn_library.setChecked(False)
         self.btn_home.setChecked(False)
+        self.btn_downloads.setChecked(False)
         for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
             b.setChecked(m == mode)
         grid = mode in ("vod", "series")
@@ -883,29 +902,108 @@ class MainWindow(QMainWindow):
                                  d.get("title"), ext, self.viewing_series.get("name", ""))
 
     def _start_download(self, url, name, ext, subdir=""):
-        self.dl_row.setVisible(True)
-        self.dl_bar.setFormat(f"{name} — %p%")
         self.downloads.start(url, name or "download", ext, subdir)
+        self.btn_downloads.setStyleSheet("font-weight:bold;")   # hint: something is running
 
-    def _on_dl_progress(self, name, done, total):
-        # QProgressBar uses 32-bit ints, so scale bytes to a 0-100 percentage.
+    # ---- downloads page -----------------------------------------------
+    def _build_downloads_page(self):
+        page = QWidget()
+        v = QVBoxLayout(page); v.setContentsMargins(8, 8, 8, 8)
+        top = QHBoxLayout()
+        hdr = QLabel("Downloads"); hdr.setObjectName("Header")
+        top.addWidget(hdr); top.addStretch()
+        btn_clear = QPushButton("Clear finished")
+        btn_clear.clicked.connect(self._clear_finished_downloads)
+        top.addWidget(btn_clear)
+        v.addLayout(top)
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setFrameShape(QFrame.NoFrame)
+        container = QWidget()
+        self.dl_vbox = QVBoxLayout(container)
+        self.dl_vbox.setContentsMargins(0, 0, 0, 0); self.dl_vbox.setSpacing(6)
+        self.dl_empty = QLabel("No downloads yet. Pick a movie or episode and hit ⬇ Download.")
+        self.dl_empty.setObjectName("Meta"); self.dl_empty.setAlignment(Qt.AlignCenter)
+        self.dl_vbox.addWidget(self.dl_empty)
+        self.dl_vbox.addStretch()
+        scroll.setWidget(container)
+        v.addWidget(scroll, 1)
+        return page
+
+    def _show_downloads(self):
+        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_library, self.btn_home):
+            b.setChecked(False)
+        self.btn_downloads.setChecked(True)
+        self.btn_downloads.setStyleSheet("")   # seen
+        self.pages.setCurrentWidget(self.downloads_page)
+
+    def _dl_row(self, did, name):
+        """Create (once) and return the widgets for a download row."""
+        if did in self._dl_widgets:
+            return self._dl_widgets[did]
+        self.dl_empty.setVisible(False)
+        frame = QFrame(); frame.setObjectName("InfoCard")
+        h = QVBoxLayout(frame); h.setContentsMargins(8, 6, 8, 6); h.setSpacing(2)
+        lbl = QLabel(name); lbl.setObjectName("Title"); lbl.setWordWrap(True)
+        h.addWidget(lbl)
+        row = QHBoxLayout()
+        bar = QProgressBar(); bar.setMaximum(100)
+        row.addWidget(bar, 1)
+        speed = QLabel("—"); speed.setObjectName("Meta"); speed.setMinimumWidth(90)
+        speed.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        row.addWidget(speed)
+        stop = QPushButton("⏹"); stop.setToolTip("Stop")
+        stop.clicked.connect(lambda _=False, i=did: self.downloads.cancel(i))
+        row.addWidget(stop)
+        h.addLayout(row)
+        status = QLabel(""); status.setObjectName("Meta")
+        h.addWidget(status)
+        # newest on top, above the trailing stretch
+        self.dl_vbox.insertWidget(0, frame)
+        self._dl_widgets[did] = {"frame": frame, "bar": bar, "speed": speed,
+                                 "status": status, "stop": stop}
+        return self._dl_widgets[did]
+
+    def _on_dl_started(self, did, name):
+        w = self._dl_row(did, name)
+        w["status"].setText("Starting…")
+
+    def _on_dl_progress(self, did, name, done, total, speed):
+        w = self._dl_row(did, name)
         mb = done / (1 << 20)
+        spd_txt = f"{speed/(1<<20):.1f} MB/s" if speed > 0 else "—"
+        w["speed"].setText(spd_txt)
         if total > 0:
-            self.dl_bar.setMaximum(100)
-            self.dl_bar.setValue(int(done * 100 / total))
-            self.dl_bar.setFormat(f"{name}  {mb:.0f}/{total/(1<<20):.0f} MB  %p%")
+            w["bar"].setMaximum(100)
+            w["bar"].setValue(int(done * 100 / total))
+            w["status"].setText(f"{mb:.0f} / {total/(1<<20):.0f} MB")
         else:
-            self.dl_bar.setMaximum(0)  # indeterminate
-            self.dl_bar.setFormat(f"{name}  {mb:.0f} MB")
+            w["bar"].setMaximum(0)   # indeterminate
+            w["status"].setText(f"{mb:.0f} MB")
 
-    def _on_dl_done(self, name, path):
-        self.dl_row.setVisible(False)
-        QMessageBox.information(self, "Download complete", f"{name}\n→ {path}")
+    def _on_dl_done(self, did, name, path):
+        w = self._dl_row(did, name)
+        w["bar"].setMaximum(100); w["bar"].setValue(100)
+        w["speed"].setText("")
+        w["status"].setText(f"✓ Done → {path}")
+        w["stop"].setEnabled(False)
+        if not self.downloads._workers:
+            self.btn_downloads.setStyleSheet("")
 
-    def _on_dl_failed(self, name, err):
-        self.dl_row.setVisible(False)
-        if err != "cancelled":
-            QMessageBox.warning(self, "Download failed", f"{name}\n{err}")
+    def _on_dl_failed(self, did, name, err):
+        w = self._dl_row(did, name)
+        w["speed"].setText("")
+        w["stop"].setEnabled(False)
+        w["status"].setText("⏹ Stopped (resumable)" if err == "cancelled"
+                            else f"✗ Failed: {err}")
+        if not self.downloads._workers:
+            self.btn_downloads.setStyleSheet("")
+
+    def _clear_finished_downloads(self):
+        active = set(self.downloads._workers.keys())
+        for did in list(self._dl_widgets.keys()):
+            if did not in active:
+                self._dl_widgets.pop(did)["frame"].deleteLater()
+        if not self._dl_widgets:
+            self.dl_empty.setVisible(True)
 
     # ---- player wiring -------------------------------------------------
     def _on_position(self, pos):
@@ -936,6 +1034,58 @@ class MainWindow(QMainWindow):
     def _on_player_info(self, info):
         # show decoder + resolution in the title so HW decode is verifiable
         self.setWindowTitle(f"{self._base_title}   [{info}]")
+
+    # ---- audio / subtitle track selection ------------------------------
+    @staticmethod
+    def _track_label(t):
+        bits = []
+        if t.get("lang"):
+            bits.append(str(t["lang"]))
+        if t.get("title"):
+            bits.append(str(t["title"]))
+        label = " · ".join(bits) or f"Track {t.get('id')}"
+        if t.get("codec"):
+            label += f"  ({t['codec']})"
+        return label
+
+    def _on_tracks_changed(self, tracks):
+        # Rebuild both pickers from mpv's track-list; block signals so
+        # repopulating doesn't fire a spurious selection back into mpv.
+        audio = [t for t in tracks if t.get("type") == "audio"]
+        subs = [t for t in tracks if t.get("type") == "sub"]
+
+        self.audio_combo.blockSignals(True)
+        self.audio_combo.clear()
+        cur_a = 0
+        for t in audio:
+            self.audio_combo.addItem(self._track_label(t), t.get("id"))
+            if t.get("selected"):
+                cur_a = self.audio_combo.count() - 1
+        if audio:
+            self.audio_combo.setCurrentIndex(cur_a)
+        self.audio_combo.setEnabled(len(audio) > 1)
+        self.audio_combo.blockSignals(False)
+
+        self.sub_combo.blockSignals(True)
+        self.sub_combo.clear()
+        self.sub_combo.addItem("Off", "no")
+        cur_s = 0
+        for t in subs:
+            self.sub_combo.addItem(self._track_label(t), t.get("id"))
+            if t.get("selected"):
+                cur_s = self.sub_combo.count() - 1
+        self.sub_combo.setCurrentIndex(cur_s)
+        self.sub_combo.setEnabled(bool(subs))
+        self.sub_combo.blockSignals(False)
+
+    def _on_audio_pick(self, _idx):
+        aid = self.audio_combo.currentData()
+        if aid is not None:
+            self.player.set_audio(aid)
+
+    def _on_sub_pick(self, _idx):
+        sid = self.sub_combo.currentData()
+        self.player.set_subtitle(sid if sid is not None else "no")
 
     def _seek(self):
         if self._duration > 0:

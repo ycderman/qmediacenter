@@ -1,6 +1,8 @@
 """Threaded download manager for VOD / episodes (resumable HTTP)."""
 import os
+import time
 import http.client
+import itertools
 import requests
 from PySide6.QtCore import QObject, QThread, Signal
 
@@ -17,7 +19,7 @@ def _safe_name(name):
 
 class DownloadWorker(QThread):
     # qlonglong: byte counts exceed 32-bit int for multi-GB files
-    progress = Signal('qlonglong', 'qlonglong')   # bytes_done, total (0 if unknown)
+    progress = Signal('qlonglong', 'qlonglong', float)   # done, total(0=unknown), bytes/s
     finished_ok = Signal(str)
     failed = Signal(str)
 
@@ -37,6 +39,10 @@ class DownloadWorker(QThread):
             done = os.path.getsize(tmp) if os.path.exists(tmp) else 0
             stall = 0          # consecutive failures with no new bytes
             last_done = -1
+            # rolling speed sample (recomputed ~twice a second)
+            spd_t = time.monotonic()
+            spd_b = done
+            speed = 0.0
             while True:
                 headers = {"User-Agent": UA}
                 if done:
@@ -59,7 +65,11 @@ class DownloadWorker(QThread):
                                 if chunk:
                                     f.write(chunk)
                                     done += len(chunk)
-                                    self.progress.emit(done, total)
+                                    now = time.monotonic()
+                                    if now - spd_t >= 0.5:
+                                        speed = (done - spd_b) / (now - spd_t)
+                                        spd_t, spd_b = now, done
+                                    self.progress.emit(done, total, speed)
                     break  # completed without error
                 except _RESUMABLE:
                     if self._cancel:
@@ -81,47 +91,58 @@ class DownloadWorker(QThread):
 
 
 class DownloadManager(QObject):
-    progress = Signal(str, 'qlonglong', 'qlonglong')   # name, done, total
-    finished_ok = Signal(str, str)
-    failed = Signal(str, str)
+    # All signals carry a stable per-download id so the UI can track several
+    # concurrent downloads independently.
+    started = Signal(str, str)                              # id, name
+    progress = Signal(str, str, 'qlonglong', 'qlonglong', float)  # id, name, done, total, bytes/s
+    finished_ok = Signal(str, str, str)                    # id, name, path
+    failed = Signal(str, str, str)                         # id, name, err
 
     def __init__(self, download_dir, parent=None):
         super().__init__(parent)
         self.download_dir = download_dir
-        self._workers = []
+        self._workers = {}            # id -> DownloadWorker
+        self._ids = itertools.count(1)
 
     def start(self, url, name, ext="mp4", subdir=""):
         filename = _safe_name(name) + "." + (ext or "mp4")
         dest = os.path.join(self.download_dir, _safe_name(subdir), filename) if subdir \
             else os.path.join(self.download_dir, filename)
+        did = str(next(self._ids))
         worker = DownloadWorker(url, dest)
-        worker.progress.connect(lambda d, t, n=name: self.progress.emit(n, d, t))
-        worker.finished_ok.connect(lambda p, n=name: self._done(worker, n, p))
-        worker.failed.connect(lambda e, n=name: self._fail(worker, n, e))
-        self._workers.append(worker)
+        worker.progress.connect(
+            lambda d, t, s, i=did, n=name: self.progress.emit(i, n, d, t, s))
+        worker.finished_ok.connect(lambda p, i=did, n=name: self._done(i, n, p))
+        worker.failed.connect(lambda e, i=did, n=name: self._fail(i, n, e))
+        self._workers[did] = worker
         worker.start()
-        return worker
+        self.started.emit(did, name)
+        return did
 
-    def _done(self, worker, name, path):
-        self.finished_ok.emit(name, path)
-        if worker in self._workers:
-            self._workers.remove(worker)
+    def cancel(self, did):
+        w = self._workers.get(did)
+        if w:
+            w.cancel()
 
-    def _fail(self, worker, name, err):
-        self.failed.emit(name, err)
-        if worker in self._workers:
-            self._workers.remove(worker)
+    def _done(self, did, name, path):
+        self.finished_ok.emit(did, name, path)
+        self._workers.pop(did, None)
+
+    def _fail(self, did, name, err):
+        self.failed.emit(did, name, err)
+        self._workers.pop(did, None)
 
     def cancel_all(self):
         """Stop active downloads (async); the .part is kept for later resume."""
-        for w in list(self._workers):
+        for w in list(self._workers.values()):
             w.cancel()
 
     def shutdown(self):
         """Cancel and join all downloads — avoids 'QThread destroyed while
         running' aborts when the window closes mid-download."""
-        for w in list(self._workers):
+        workers = list(self._workers.values())
+        for w in workers:
             w.cancel()
-        for w in list(self._workers):
+        for w in workers:
             w.wait(3000)
         self._workers.clear()
