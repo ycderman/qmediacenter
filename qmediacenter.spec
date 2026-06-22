@@ -3,7 +3,7 @@
 a = Analysis(
     ['main.py'],
     datas=[('data', 'data')],
-    hiddenimports=['media.plex', 'media.emby'],
+    hiddenimports=['media.plex', 'media.emby', 'dbus', 'dbus.mainloop.glib', 'gi', 'gi.repository.GLib'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

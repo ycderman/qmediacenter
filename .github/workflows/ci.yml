@@ -3,12 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 jobs:
-  # ── Syntax check: every push ───────────────────────────────────────────────
+  # ── Syntax check ───────────────────────────────────────────────────────────
   syntax:
     name: Python syntax
     runs-on: ubuntu-latest
@@ -35,7 +36,7 @@ jobs:
           print(f"OK — {len(files)} files")
           EOF
 
-  # ── Headless UI tests: every push ─────────────────────────────────────────
+  # ── Headless UI tests ─────────────────────────────────────────────────────
   test:
     name: Headless UI tests
     runs-on: ubuntu-latest
@@ -59,11 +60,12 @@ jobs:
           LC_NUMERIC: C
         run: python test_ui.py
 
-  # ── PyInstaller bundle on Ubuntu 22.04 (standard glibc ELF) ───────────────
+  # ── PyInstaller bundle (Ubuntu 22.04) ─────────────────────────────────────
   bundle:
     name: PyInstaller bundle
     runs-on: ubuntu-22.04
-    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -76,34 +78,45 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends libmpv-dev
+          sudo apt-get install -y --no-install-recommends \
+            libmpv-dev libdbus-1-dev pkg-config \
+            libgirepository1.0-dev gir1.2-glib-2.0
       - name: Install Python dependencies
-        run: pip install --quiet pyside6 mpv pyopengl requests yt-dlp pyinstaller
+        run: |
+          pip install --quiet \
+            pyside6 mpv pyopengl requests yt-dlp \
+            dbus-python PyGObject \
+            pyinstaller
       - name: Get version
         id: version
         run: |
-          V=$(git describe --tags --abbrev=0 2>/dev/null | tr -d 'v' || echo "0.3.0")
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            V="${{ github.ref_name }}"; V="${V#v}"
+          else
+            V=$(git describe --tags --abbrev=0 2>/dev/null | tr -d 'v' || echo "0.4.0")
+          fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Version: $V"
       - name: Build with PyInstaller
         run: pyinstaller qmediacenter.spec --clean --noconfirm
-      - name: Verify ELF interpreter is standard (not Nix)
+      - name: Verify binary is not Nix-linked
         run: |
-          INTERP=$(readelf -l dist/qmediacenter/qmediacenter | grep interpreter | grep -oP '(?<=\[).*(?=\])' || true)
+          INTERP=$(readelf -l dist/qmediacenter/qmediacenter \
+            | grep -oP '(?<=interpreter: ).*(?=\])' || true)
           echo "ELF interpreter: $INTERP"
           if echo "$INTERP" | grep -q "/nix/store"; then
-            echo "ERROR: Binary has Nix store interpreter — will not run on other distros"; exit 1
+            echo "ERROR: Nix store interpreter found"; exit 1
           fi
       - name: Write version file into bundle
         run: echo "${{ steps.version.outputs.version }}" > dist/qmediacenter/.version
-      - name: Upload bundle as artifact
+      - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
           name: bundle
           path: dist/qmediacenter/
           retention-days: 1
 
-  # ── Build .deb on Ubuntu 22.04 ────────────────────────────────────────────
+  # ── Build .deb ────────────────────────────────────────────────────────────
   build-deb:
     name: Build .deb
     runs-on: ubuntu-22.04
@@ -116,10 +129,7 @@ jobs:
           name: bundle
           path: dist/qmediacenter/
       - name: Restore permissions
-        run: |
-          chmod +x dist/qmediacenter/qmediacenter
-          echo "Binary mode: $(stat -c %a dist/qmediacenter/qmediacenter)"
-          ls dist/qmediacenter/ | head -5
+        run: chmod +x dist/qmediacenter/qmediacenter
       - name: Install fpm
         run: |
           sudo apt-get update -q
@@ -127,14 +137,14 @@ jobs:
           sudo gem install fpm --no-document
       - name: Build .deb
         run: |
-          VERSION=$(cat dist/qmediacenter/.version || echo "0.3.0")
-          echo "Version: $VERSION"
+          VERSION=$(cat dist/qmediacenter/.version || echo "0.4.0")
           fpm -s dir -t deb \
             -n qmediacenter -v "$VERSION" -a x86_64 \
             --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
             --url "https://github.com/ycderman/qmediacenter" \
             --license MIT \
             --depends "libmpv1 | libmpv2" \
+            --depends "libdbus-1-3" \
             --category video \
             --deb-no-default-config-files \
             --after-install packaging/postinst \
@@ -144,14 +154,14 @@ jobs:
             "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
             "data/qmediacenter.png=/usr/share/pixmaps/qmediacenter.png"
           ls -lh dist/*.deb
-      - name: Upload .deb
+      - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: deb-package
           path: dist/*.deb
           retention-days: 7
 
-  # ── Build .rpm on Fedora 41 (rpmbuild native) ─────────────────────────────
+  # ── Build .rpm (Fedora 41) ────────────────────────────────────────────────
   build-rpm:
     name: Build .rpm
     runs-on: ubuntu-latest
@@ -165,26 +175,21 @@ jobs:
           name: bundle
           path: dist/qmediacenter/
       - name: Restore permissions
-        run: |
-          chmod +x dist/qmediacenter/qmediacenter
-          echo "Binary mode: $(stat -c %a dist/qmediacenter/qmediacenter)"
-          ls dist/qmediacenter/ | head -5
+        run: chmod +x dist/qmediacenter/qmediacenter
       - name: Install fpm
         run: |
           dnf install -y ruby ruby-devel gcc make rpm-build redhat-rpm-config
           gem install fpm --no-document
-      - name: Debug rpmbuild
-        run: rpmbuild --version && rpmbuild --showrc | grep -E "^macro|buildroot" | head -5 || true
       - name: Build .rpm
         run: |
-          VERSION=$(cat dist/qmediacenter/.version || echo "0.3.0")
-          echo "Version: $VERSION"
+          VERSION=$(cat dist/qmediacenter/.version || echo "0.4.0")
           fpm -s dir -t rpm \
             -n qmediacenter -v "$VERSION" -a x86_64 \
             --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
             --url "https://github.com/ycderman/qmediacenter" \
             --license MIT \
             --depends mpv-libs \
+            --depends dbus-libs \
             --category "Applications/Multimedia" \
             --after-install packaging/postinst \
             --after-remove  packaging/postrm \
@@ -193,16 +198,16 @@ jobs:
             "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
             "data/qmediacenter.png=/usr/share/pixmaps/qmediacenter.png"
           ls -lh dist/*.rpm
-      - name: Upload .rpm
+      - name: Upload .rpm artifact
         uses: actions/upload-artifact@v4
         with:
           name: rpm-package
           path: dist/*.rpm
           retention-days: 7
 
-  # ── Smoke test: install .deb on Ubuntu 24.04 ──────────────────────────────
+  # ── Smoke test: .deb on Ubuntu 24.04 ─────────────────────────────────────
   smoke-deb:
-    name: Install .deb — Ubuntu 24.04
+    name: Smoke test .deb — Ubuntu 24.04
     runs-on: ubuntu-24.04
     needs: build-deb
     steps:
@@ -215,24 +220,23 @@ jobs:
         run: sudo apt-get update -q && sudo apt-get install -y libmpv2
       - name: Install .deb
         run: sudo dpkg -i dist/*.deb
-      - name: Verify binary
+      - name: Verify binary installed
         run: |
-          echo "=== installed files ===" && dpkg -L qmediacenter | head -30
-          echo "=== /opt contents ===" && ls -la /opt/ || true
-          echo "=== /opt/qmediacenter ===" && ls -la /opt/qmediacenter/ || true
+          dpkg -L qmediacenter | head -20
           test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
-      - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
+      - name: Smoke test — must not crash
         run: |
-          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter || EXIT=$?
-          echo "Exit code: ${EXIT:-0}"
+          QT_QPA_PLATFORM=offscreen LC_NUMERIC=C timeout 5 \
+            /opt/qmediacenter/qmediacenter || EXIT=$?
+          echo "Exit: ${EXIT:-0}"
           if [ "${EXIT:-0}" -eq 134 ] || [ "${EXIT:-0}" -eq 139 ]; then
-            echo "FAIL: process crashed (signal $((${EXIT:-0} - 128)))"; exit 1
+            echo "FAIL: crashed (signal $((${EXIT:-0}-128)))"; exit 1
           fi
           echo "PASS"
 
-  # ── Smoke test: install .rpm on Fedora 41 ─────────────────────────────────
+  # ── Smoke test: .rpm on Fedora 41 ─────────────────────────────────────────
   smoke-rpm:
-    name: Install .rpm — Fedora 41
+    name: Smoke test .rpm — Fedora 41
     runs-on: ubuntu-latest
     needs: build-rpm
     container: fedora:41
@@ -246,16 +250,41 @@ jobs:
         run: dnf install -y mpv-libs
       - name: Install .rpm
         run: dnf install -y dist/*.rpm
-      - name: Verify binary
+      - name: Verify binary installed
         run: |
-          echo "=== installed files ===" && rpm -ql qmediacenter | head -30
-          echo "=== /opt/qmediacenter ===" && ls -la /opt/qmediacenter/ || true
+          rpm -ql qmediacenter | head -20
           test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
-      - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
+      - name: Smoke test — must not crash
         run: |
-          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter || EXIT=$?
-          echo "Exit code: ${EXIT:-0}"
+          QT_QPA_PLATFORM=offscreen LC_NUMERIC=C timeout 5 \
+            /opt/qmediacenter/qmediacenter || EXIT=$?
+          echo "Exit: ${EXIT:-0}"
           if [ "${EXIT:-0}" -eq 134 ] || [ "${EXIT:-0}" -eq 139 ]; then
-            echo "FAIL: process crashed (signal $((${EXIT:-0} - 128)))"; exit 1
+            echo "FAIL: crashed (signal $((${EXIT:-0}-128)))"; exit 1
           fi
           echo "PASS"
+
+  # ── GitHub Release (yalnızca tag push'ta) ─────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [smoke-deb, smoke-rpm]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download .deb
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+          path: dist/
+      - name: Download .rpm
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package
+          path: dist/
+      - name: Create release with packages
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

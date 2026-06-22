@@ -10,9 +10,9 @@ try:
     import dbus.mainloop.glib
     from gi.repository import GLib
     _AVAILABLE = True
-except ImportError:
+except Exception:
     _AVAILABLE = False
-    log.warning("dbus-python/pygobject not found; MPRIS2 disabled")
+    log.warning("dbus-python/pygobject not available; MPRIS2 disabled")
 
 MPRIS_IFACE  = "org.mpris.MediaPlayer2"
 PLAYER_IFACE = "org.mpris.MediaPlayer2.Player"
