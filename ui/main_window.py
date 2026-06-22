@@ -362,10 +362,12 @@ class MainWindow(QMainWindow):
         mc = config.media_config()
         paths = mc.get("library_paths", [])
         emby_cfg = mc.get("emby", {})
+        plex_cfg = mc.get("plex", {})
         has_emby = bool(emby_cfg.get("url") and emby_cfg.get("api_key"))
-        if not paths and not has_emby:
+        has_plex = bool(plex_cfg.get("url") and plex_cfg.get("token"))
+        if not paths and not has_emby and not has_plex:
             QMessageBox.information(self, "No sources",
-                                   "Add folders or an Emby server first via ⚙ Sources.")
+                                   "Add folders, an Emby or a Plex server first via ⚙ Sources.")
             return
         self._scanning = True
         # When a TMDb key is set, refresh the official IMDb ratings dataset first
@@ -380,7 +382,10 @@ class MainWindow(QMainWindow):
             result = self.scanner.scan(paths) if paths else (0, 0)
             if has_emby:
                 from media.emby import sync_emby
-                sync_emby(self.db, emby_cfg)   # raises on auth/connection errors
+                sync_emby(self.db, emby_cfg)
+            if has_plex:
+                from media.plex import sync_plex
+                sync_plex(self.db, plex_cfg)
             return result
 
         worker = Worker(job, self)
