@@ -6,8 +6,14 @@ Items are upserted into the same ``media`` table the local scanner uses, with
 ``source="emby"`` and a stream URL as their ``path`` so playback just works.
 """
 import logging
+import re
 
 import requests
+
+_UUID_RE = re.compile(
+    r'^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$',
+    re.I,
+)
 
 log = logging.getLogger(__name__)
 
@@ -34,10 +40,15 @@ class EmbyClient:
         return r.json()
 
     def _resolve_user(self):
-        """Emby needs a user id to list items; fall back to the first account."""
-        if self.user_id:
+        """Resolve user_id to a UUID. Accepts a UUID directly or a username."""
+        if self.user_id and _UUID_RE.match(self.user_id):
             return self.user_id
         users = self._get("/Users") or []
+        if self.user_id:
+            for u in users:
+                if u.get("Name", "").lower() == self.user_id.lower():
+                    self.user_id = u.get("Id", "")
+                    return self.user_id
         if users:
             self.user_id = users[0].get("Id", "")
         return self.user_id

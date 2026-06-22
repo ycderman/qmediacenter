@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QListWidget,
     QListWidgetItem, QLineEdit, QLabel, QSlider, QSplitter, QMessageBox,
     QProgressBar, QFrame, QScrollArea, QSizePolicy, QStackedWidget, QComboBox,
+    QGraphicsDropShadowEffect,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QTimer, QEvent
 from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
@@ -479,13 +480,21 @@ class MainWindow(QMainWindow):
         v.addWidget(strip)
         return box
 
+    @staticmethod
+    def _track_pill(icon_text, combo):
+        pill = QFrame(); pill.setObjectName("TrackPill")
+        h = QHBoxLayout(pill)
+        h.setContentsMargins(8, 0, 6, 0); h.setSpacing(2)
+        lbl = QLabel(icon_text); lbl.setObjectName("TrackIcon")
+        h.addWidget(lbl); h.addWidget(combo)
+        return pill
+
     def _build_controls(self):
         bar = QWidget()
         bar.setObjectName("ControlsBar")
         ctl = QHBoxLayout(bar)
-        ctl.setContentsMargins(8, 4, 8, 4)
-        # Three separate transport buttons (play / pause / stop) with glyph labels
-        # — standardIcon themes render invisibly on the dark buttons.
+        ctl.setContentsMargins(10, 6, 10, 6); ctl.setSpacing(6)
+
         self.btn_play = QPushButton("▶"); self.btn_play.setObjectName("Transport")
         self.btn_play.setToolTip("Play")
         self.btn_play.clicked.connect(lambda: self.player.set_pause(False))
@@ -496,26 +505,35 @@ class MainWindow(QMainWindow):
         self.btn_stop.setToolTip("Stop")
         self.btn_stop.clicked.connect(self._stop_playback)
         ctl.addWidget(self.btn_play); ctl.addWidget(self.btn_pause); ctl.addWidget(self.btn_stop)
+
         self.pos_slider = SeekSlider(Qt.Horizontal); self.pos_slider.setRange(0, 1000)
         self.pos_slider.sliderReleased.connect(self._seek)
         ctl.addWidget(self.pos_slider, 1)
-        self.time_lbl = QLabel("00:00 / 00:00"); self.time_lbl.setObjectName("Meta")
+
+        self.time_lbl = QLabel("00:00 / 00:00"); self.time_lbl.setObjectName("TimeLabel")
         ctl.addWidget(self.time_lbl)
-        # Audio + subtitle track pickers (populated from mpv's track-list).
-        self.audio_combo = QComboBox(); self.audio_combo.setToolTip("Audio track")
-        self.audio_combo.setMaximumWidth(150)
-        self.audio_combo.activated.connect(self._on_audio_pick)
-        ctl.addWidget(QLabel("🔉")); ctl.addWidget(self.audio_combo)
-        self.sub_combo = QComboBox(); self.sub_combo.setToolTip("Subtitles")
-        self.sub_combo.setMaximumWidth(150)
-        self.sub_combo.activated.connect(self._on_sub_pick)
-        ctl.addWidget(QLabel("💬")); ctl.addWidget(self.sub_combo)
-        vlbl = QLabel("🔊"); ctl.addWidget(vlbl)
-        self.vol = QSlider(Qt.Horizontal); self.vol.setRange(0, 150); self.vol.setFixedWidth(110)
+
+        self.audio_combo = QComboBox(); self.audio_combo.setObjectName("TrackCombo")
+        self.audio_combo.setToolTip("Audio track"); self.audio_combo.setMinimumWidth(110)
+        self.audio_combo.setMaximumWidth(160); self.audio_combo.activated.connect(self._on_audio_pick)
+        ctl.addWidget(self._track_pill("🔉", self.audio_combo))
+
+        self.sub_combo = QComboBox(); self.sub_combo.setObjectName("TrackCombo")
+        self.sub_combo.setToolTip("Subtitles"); self.sub_combo.setMinimumWidth(110)
+        self.sub_combo.setMaximumWidth(160); self.sub_combo.activated.connect(self._on_sub_pick)
+        ctl.addWidget(self._track_pill("💬", self.sub_combo))
+
+        vol_pill = QFrame(); vol_pill.setObjectName("TrackPill")
+        vh = QHBoxLayout(vol_pill); vh.setContentsMargins(8, 0, 8, 0); vh.setSpacing(6)
+        vh.addWidget(QLabel("🔊"))
+        self.vol = QSlider(Qt.Horizontal); self.vol.setRange(0, 150); self.vol.setFixedWidth(90)
         self.vol.setValue(self.settings.get("volume", 100))
         self.vol.valueChanged.connect(self._set_volume)
-        ctl.addWidget(self.vol)
-        self.btn_fs = QPushButton("⛶")
+        vh.addWidget(self.vol)
+        ctl.addWidget(vol_pill)
+
+        self.btn_fs = QPushButton("⛶"); self.btn_fs.setObjectName("Transport")
+        self.btn_fs.setToolTip("Fullscreen")
         self.btn_fs.clicked.connect(self._toggle_fullscreen)
         ctl.addWidget(self.btn_fs)
         return bar

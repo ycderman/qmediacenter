@@ -170,6 +170,38 @@ def build_qss(accent="#3daee9"):
         background: #ffffff; color: #232629;
         selection-background-color: {accent}; selection-color: #ffffff;
     }}
+
+    /* track / volume pills in the player controls bar */
+    QFrame#TrackPill {{
+        background-color: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+    }}
+    QLabel#TrackIcon {{
+        font-size: 15px;
+        background: transparent;
+        padding: 0 2px;
+        color: #232629;
+    }}
+    QComboBox#TrackCombo {{
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        padding: 5px 4px 5px 2px;
+        color: #232629;
+        font-size: 13px;
+    }}
+    QComboBox#TrackCombo::drop-down {{ border: none; width: 16px; }}
+    QComboBox#TrackCombo:disabled {{ color: #9aa0a3; }}
+    QComboBox#TrackCombo QAbstractItemView {{
+        background: #ffffff; color: #232629;
+        selection-background-color: {accent}; selection-color: #ffffff;
+        border-radius: 6px;
+    }}
+    QLabel#TimeLabel {{
+        font-size: 12px; font-variant-numeric: tabular-nums;
+        color: #4d5256; background: transparent; padding: 0 4px;
+    }}
     QTabWidget::pane {{ border: 1px solid #c4c9cd; border-radius: 8px; }}
     QTabBar::tab {{
         background: #e4e6e8; color: #232629;

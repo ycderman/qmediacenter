@@ -6,12 +6,31 @@ import locale
 import logging
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QPainterPath
+from PySide6.QtCore import Qt
 
 from iptv import config
 from iptv.xtream import XtreamClient
 from ui.login_dialog import LoginDialog
 from ui.main_window import MainWindow
+
+
+def _rounded_icon(path, size=256):
+    src = QPixmap(path)
+    if src.isNull():
+        return QIcon(path)
+    src = src.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    out = QPixmap(src.size())
+    out.fill(Qt.transparent)
+    painter = QPainter(out)
+    painter.setRenderHint(QPainter.Antialiasing)
+    clip = QPainterPath()
+    r = src.width() * 0.22
+    clip.addRoundedRect(0, 0, src.width(), src.height(), r, r)
+    painter.setClipPath(clip)
+    painter.drawPixmap(0, 0, src)
+    painter.end()
+    return QIcon(out)
 
 
 def _auto_profile():
@@ -37,7 +56,7 @@ def main():
     for _cand in ("data/qmediacenter.png", "qmediacenter.png"):
         _icon = os.path.join(_here, _cand)
         if os.path.exists(_icon):
-            app.setWindowIcon(QIcon(_icon))
+            app.setWindowIcon(_rounded_icon(_icon))
             break
     # Qt resets LC_NUMERIC from the environment; libmpv requires "C".
     locale.setlocale(locale.LC_NUMERIC, "C")

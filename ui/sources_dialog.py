@@ -128,9 +128,10 @@ class SourcesDialog(QDialog):
         self.emby_url = QLineEdit(emby.get("url", "")); self.emby_url.setPlaceholderText("http://host:8096")
         self.emby_key = QLineEdit(emby.get("api_key", "")); self.emby_key.setEchoMode(QLineEdit.Password)
         self.emby_user = QLineEdit(emby.get("user_id", ""))
+        self.emby_user.setPlaceholderText("username or UUID (blank = first user)")
         ef.addRow("Server URL", self.emby_url)
         ef.addRow("API key", self.emby_key)
-        ef.addRow("User ID", self.emby_user)
+        ef.addRow("Username", self.emby_user)
         v.addLayout(ef)
 
         v.addSpacing(12)
