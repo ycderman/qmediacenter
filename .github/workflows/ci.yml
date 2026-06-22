@@ -108,7 +108,7 @@ jobs:
             echo "ERROR: Nix store interpreter found"; exit 1
           fi
       - name: Write version file into bundle
-        run: echo "${{ steps.version.outputs.version }}" > dist/qmediacenter/.version
+        run: echo "${{ steps.version.outputs.version }}" > dist/qmediacenter/VERSION
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
         with:
@@ -137,7 +137,7 @@ jobs:
           sudo gem install fpm --no-document
       - name: Build .deb
         run: |
-          VERSION=$(cat dist/qmediacenter/.version || echo "0.4.0")
+          VERSION=$(cat dist/qmediacenter/VERSION || echo "0.4.0")
           fpm -s dir -t deb \
             -n qmediacenter -v "$VERSION" -a x86_64 \
             --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
@@ -183,7 +183,7 @@ jobs:
           gem install fpm --no-document
       - name: Build .rpm
         run: |
-          VERSION=$(cat dist/qmediacenter/.version || echo "0.4.0")
+          VERSION=$(cat dist/qmediacenter/VERSION || echo "0.4.0")
           fpm -s dir -t rpm \
             -n qmediacenter -v "$VERSION" -a x86_64 \
             --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
