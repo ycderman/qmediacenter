@@ -360,7 +360,7 @@ class MainWindow(QMainWindow):
             self._lib_source = source
         source = getattr(self, "_lib_source", None)
         kind = self.lib_kind.currentData()
-        items = self.db.media(kind=kind, source=source, order="recent")
+        items = self.db.media(kind=kind, source=source, order="title")
         self.lib_list.clear()
         src_names = {"local": "MyMedia", "emby": "Emby", "plex": "Plex"}
         hdr = src_names.get(source, "Library") if source else "Library"
@@ -696,6 +696,8 @@ class MainWindow(QMainWindow):
         self.content_list.clear()
         if isinstance(items, Exception) or not items:
             self.content_header.setText("Empty"); return
+        if self.mode in ("vod", "series"):
+            items = sorted(items, key=lambda d: (d.get("name") or d.get("title") or "").lower())
         self.content_header.setText(f"{len(items)} items")
         grid = self.mode in ("vod", "series")
         for d in items:
