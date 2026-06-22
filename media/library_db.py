@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS meta_cache (
     payload    TEXT NOT NULL,      -- JSON
     fetched_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS watched (
+    item_key   TEXT PRIMARY KEY,
+    watched_at REAL NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_media_kind ON media(kind);
 CREATE INDEX IF NOT EXISTS idx_progress_updated ON progress(updated_at);
 """
@@ -81,6 +85,7 @@ class LibraryDB:
         # Drop near-finished items from the resume row so they don't linger.
         if duration and position / duration > 0.95:
             self.clear_progress(item_key)
+            self.mark_watched(item_key)
             return
         with self._lock:
             self._conn.execute(
@@ -107,6 +112,34 @@ class LibraryDB:
         with self._lock:
             self._conn.execute("DELETE FROM progress WHERE item_key=?", (item_key,))
             self._conn.commit()
+
+    # ---- watched --------------------------------------------------------
+    def mark_watched(self, item_key):
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO watched (item_key, watched_at) VALUES (?,?)",
+                (item_key, time.time()))
+            self._conn.commit()
+
+    def unmark_watched(self, item_key):
+        with self._lock:
+            self._conn.execute("DELETE FROM watched WHERE item_key=?", (item_key,))
+            self._conn.commit()
+
+    def is_watched(self, item_key):
+        with self._lock:
+            return self._conn.execute(
+                "SELECT 1 FROM watched WHERE item_key=?", (item_key,)).fetchone() is not None
+
+    def watched_keys(self, item_keys):
+        if not item_keys:
+            return set()
+        placeholders = ",".join("?" * len(item_keys))
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT item_key FROM watched WHERE item_key IN ({placeholders})",
+                list(item_keys)).fetchall()
+        return {r["item_key"] for r in rows}
 
     def continue_watching(self, limit=20):
         with self._lock:

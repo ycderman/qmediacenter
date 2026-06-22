@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (
     QGraphicsDropShadowEffect,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QSize, QTimer, QEvent, QByteArray
-from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence, QPainter
+from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence, QPainter, QColor, QFont, QAction
+from PySide6.QtWidgets import QMenu
 from PySide6.QtSvg import QSvgRenderer
 
 from iptv import config
@@ -23,6 +24,26 @@ from media.imdb_ratings import ImdbRatings
 
 ROLE = Qt.UserRole
 POSTER = QSize(132, 198)
+
+
+def _apply_watched_badge(pixmap):
+    """Return a copy of pixmap with a translucent 'İzlendi' bar at the bottom."""
+    out = QPixmap(pixmap.size())
+    out.fill(Qt.transparent)
+    p = QPainter(out)
+    p.drawPixmap(0, 0, pixmap)
+    bar_h = max(28, pixmap.height() // 6)
+    p.fillRect(0, pixmap.height() - bar_h, pixmap.width(), bar_h,
+               QColor(0, 0, 0, 170))
+    p.setPen(QColor(255, 255, 255))
+    font = QFont()
+    font.setPointSize(9)
+    font.setBold(True)
+    p.setFont(font)
+    p.drawText(0, pixmap.height() - bar_h, pixmap.width(), bar_h,
+               Qt.AlignCenter, "✓ İzlendi")
+    p.end()
+    return out
 
 _EMBY_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <circle cx="50" cy="50" r="50" fill="#52B54B"/>
@@ -98,6 +119,7 @@ class MainWindow(QMainWindow):
         self._lib_source = None
         self.mpris = None
         self.inhibitor = None
+        self._return_page = None
 
         self.downloads = DownloadManager(
             self.settings.get("download_dir") or config.download_dir(), self)
@@ -364,6 +386,8 @@ class MainWindow(QMainWindow):
         self.lib_list.setWordWrap(True)
         self.lib_list.itemClicked.connect(self._show_detail)        # single click -> info
         self.lib_list.itemActivated.connect(self._on_library_activated)  # double click -> play
+        self.lib_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.lib_list.customContextMenuRequested.connect(self._lib_context_menu)
         v.addWidget(self.lib_list, 1)
         return page
 
@@ -404,6 +428,7 @@ class MainWindow(QMainWindow):
         src_names = {"local": "MyMedia", "emby": "Emby", "plex": "Plex"}
         hdr = src_names.get(source, "Library") if source else "Library"
         self.lib_header.setText(f"{hdr} — {len(items)} items")
+        watched = self.db.watched_keys([d.get("item_key") for d in items])
         for d in items:
             label = d.get("title") or "?"
             if d.get("year"):
@@ -412,14 +437,20 @@ class MainWindow(QMainWindow):
                 label += f"  ⭐{d['rating']:.1f}"
             it = QListWidgetItem(label)
             it.setData(ROLE, d)
+            it.setData(Qt.UserRole + 1, d.get("item_key") in watched)
             it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
             it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
             poster = d.get("poster")
+            is_watched = d.get("item_key") in watched
             if poster:
                 if poster.startswith(("http://", "https://")):
-                    self._load_poster(it, poster)
+                    self._load_poster(it, poster, watched=is_watched)
                 elif os.path.exists(poster):
-                    it.setIcon(QIcon(QPixmap(poster)))
+                    pm = QPixmap(poster).scaled(POSTER, Qt.KeepAspectRatio,
+                                                Qt.SmoothTransformation)
+                    if is_watched:
+                        pm = _apply_watched_badge(pm)
+                    it.setIcon(QIcon(pm))
             self.lib_list.addItem(it)
 
     def _on_library_activated(self, item):
@@ -429,6 +460,37 @@ class MainWindow(QMainWindow):
         if d.get("kind") == "photo":
             return  # photo viewer comes later
         self._play(d.get("path"), d.get("title"), item_key=d.get("item_key"))
+
+    def _lib_context_menu(self, pos):
+        item = self.lib_list.itemAt(pos)
+        if not item:
+            return
+        d = item.data(ROLE)
+        item_key = d.get("item_key")
+        if not item_key:
+            return
+        is_watched = self.db.is_watched(item_key)
+        menu = QMenu(self)
+        if is_watched:
+            act = menu.addAction("✗ İzlenmedi olarak işaretle")
+            act.triggered.connect(lambda: self._toggle_watched(item, item_key, False))
+        else:
+            act = menu.addAction("✓ İzlendi olarak işaretle")
+            act.triggered.connect(lambda: self._toggle_watched(item, item_key, True))
+        menu.exec(self.lib_list.viewport().mapToGlobal(pos))
+
+    def _toggle_watched(self, item, item_key, mark):
+        if mark:
+            self.db.mark_watched(item_key)
+        else:
+            self.db.unmark_watched(item_key)
+        item.setData(Qt.UserRole + 1, mark)
+        # Refresh icon badge
+        icon = item.icon()
+        pm = icon.pixmap(POSTER) if not icon.isNull() else QPixmap(POSTER)
+        if mark:
+            pm = _apply_watched_badge(pm)
+        item.setIcon(QIcon(pm))
 
     def _open_sources(self):
         dlg = SourcesDialog(self)
@@ -759,11 +821,13 @@ class MainWindow(QMainWindow):
                 self._load_poster(it, url)
             self.content_list.addItem(it)
 
-    def _load_poster(self, item, url):
+    def _load_poster(self, item, url, *, watched=False):
         if not url:
             return
-        def apply(pm, it=item):
+        def apply(pm, it=item, w=watched):
             try:
+                if w:
+                    pm = _apply_watched_badge(pm)
                 it.setIcon(QIcon(pm))
             except RuntimeError:
                 pass
@@ -880,7 +944,11 @@ class MainWindow(QMainWindow):
             self.mpris.on_stop()
         if self.inhibitor:
             self.inhibitor.uninhibit()
-        self._show_content()
+        if self._return_page is not None:
+            self.pages.setCurrentWidget(self._return_page)
+            self._return_page = None
+        else:
+            self._show_content()
 
     def _open_series(self, series):
         self.viewing_series = series
@@ -913,6 +981,7 @@ class MainWindow(QMainWindow):
     def _play(self, url, title=None, item_key=None, poster="", kind="movie"):
         if not url:
             return
+        self._return_page = self.pages.currentWidget()
         self.pages.setCurrentWidget(self.watch_page)
         if title:
             self._base_title = f"QMediaCenter — {title}"
