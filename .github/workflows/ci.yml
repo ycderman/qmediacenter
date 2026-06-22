@@ -250,7 +250,7 @@ jobs:
           name: rpm-package
           path: dist/
       - name: Install runtime deps
-        run: dnf install -y mpv-libs wayland libva
+        run: dnf install -y mpv-libs libva
       - name: Install .rpm
         run: dnf install -y dist/*.rpm
       - name: Verify binary installed
