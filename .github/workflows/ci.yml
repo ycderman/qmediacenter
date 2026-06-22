@@ -127,6 +127,9 @@ jobs:
             --after-remove packaging/postrm \
             --rpm-rpmbuild-define "debug_package %{nil}" \
             --rpm-rpmbuild-define "_build_id_links none" \
+            --rpm-rpmbuild-define "__os_install_post %{nil}" \
+            --rpm-rpmbuild-define "__brp_check_rpaths %{nil}" \
+            --rpm-rpmbuild-define "__brp_mangle_shebangs %{nil}" \
             --package dist/ \
             "dist/qmediacenter/=/opt/qmediacenter/" \
             "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
