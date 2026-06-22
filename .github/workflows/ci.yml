@@ -69,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-tags: true
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -94,6 +94,8 @@ jobs:
           if echo "$INTERP" | grep -q "/nix/store"; then
             echo "ERROR: Binary has Nix store interpreter — will not run on other distros"; exit 1
           fi
+      - name: Write version file into bundle
+        run: echo "${{ steps.version.outputs.version }}" > dist/qmediacenter/.version
       - name: Upload bundle as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -120,7 +122,8 @@ jobs:
           sudo gem install fpm --no-document
       - name: Build .deb
         run: |
-          VERSION=${{ needs.bundle.outputs.version }}
+          VERSION=$(cat dist/qmediacenter/.version || echo "0.3.0")
+          echo "Version: $VERSION"
           fpm -s dir -t deb \
             -n qmediacenter -v "$VERSION" -a x86_64 \
             --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
@@ -160,9 +163,12 @@ jobs:
         run: |
           dnf install -y ruby ruby-devel gcc make rpm-build redhat-rpm-config
           gem install fpm --no-document
+      - name: Debug rpmbuild
+        run: rpmbuild --version && rpmbuild --showrc | grep -E "^macro|buildroot" | head -5 || true
       - name: Build .rpm
         run: |
-          VERSION=${{ needs.bundle.outputs.version }}
+          VERSION=$(cat dist/qmediacenter/.version || echo "0.3.0")
+          echo "Version: $VERSION"
           fpm -s dir -t rpm \
             -n qmediacenter -v "$VERSION" -a x86_64 \
             --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
