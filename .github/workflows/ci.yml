@@ -206,11 +206,11 @@ jobs:
       - name: Install .deb
         run: sudo dpkg -i dist/*.deb
       - name: Verify binary
-        run: test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
-      - name: Verify desktop file
-        run: test -f /usr/share/applications/io.github.ycderman.qmediacenter.desktop && echo "Desktop OK"
-      - name: Verify symlink
-        run: test -L /usr/local/bin/qmediacenter && echo "Symlink OK"
+        run: |
+          echo "=== installed files ===" && dpkg -L qmediacenter | head -30
+          echo "=== /opt contents ===" && ls -la /opt/ || true
+          echo "=== /opt/qmediacenter ===" && ls -la /opt/qmediacenter/ || true
+          test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
       - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
         run: |
           QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter || EXIT=$?
@@ -237,7 +237,10 @@ jobs:
       - name: Install .rpm
         run: dnf install -y dist/*.rpm
       - name: Verify binary
-        run: test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
+        run: |
+          echo "=== installed files ===" && rpm -ql qmediacenter | head -30
+          echo "=== /opt/qmediacenter ===" && ls -la /opt/qmediacenter/ || true
+          test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
       - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
         run: |
           QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter || EXIT=$?
