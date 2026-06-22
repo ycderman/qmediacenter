@@ -59,63 +59,142 @@ jobs:
           LC_NUMERIC: C
         run: python test_ui.py
 
-  # ── Package install smoke test: on release or manual trigger ──────────────
+  # ── Build packages on standard Ubuntu (glibc compatible ELF) ──────────────
+  build:
+    name: Build .deb and .rpm
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libmpv2 libmpv-dev \
+            ruby ruby-dev build-essential rpm
+          sudo gem install fpm --no-document
+      - name: Install Python dependencies
+        run: pip install --quiet pyside6 mpv pyopengl requests yt-dlp pyinstaller
+      - name: Build with PyInstaller
+        run: pyinstaller qmediacenter.spec --clean --noconfirm
+      - name: Build .deb package
+        run: |
+          VERSION=$(python - <<'EOF'
+          import importlib.util, sys
+          # read version from git tag or fallback
+          import subprocess
+          try:
+              tag = subprocess.check_output(
+                  ["git", "describe", "--tags", "--abbrev=0"], text=True).strip().lstrip("v")
+          except Exception:
+              tag = "0.3.0"
+          print(tag)
+          EOF
+          )
+          echo "Building v$VERSION"
+          fpm -s dir -t deb \
+            -n qmediacenter \
+            -v "$VERSION" \
+            -a x86_64 \
+            --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
+            --url "https://github.com/ycderman/qmediacenter" \
+            --license MIT \
+            --depends "libmpv1 | libmpv2" \
+            --category "video" \
+            --deb-no-default-config-files \
+            --after-install packaging/postinst \
+            --after-remove packaging/postrm \
+            --package dist/ \
+            "dist/qmediacenter/=/opt/qmediacenter/" \
+            "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
+            "data/qmediacenter.png=/usr/share/pixmaps/qmediacenter.png"
+      - name: Build .rpm package
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null | tr -d 'v' || echo "0.3.0")
+          fpm -s dir -t rpm \
+            -n qmediacenter \
+            -v "$VERSION" \
+            -a x86_64 \
+            --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
+            --url "https://github.com/ycderman/qmediacenter" \
+            --license MIT \
+            --depends "mpv-libs" \
+            --category "Applications/Multimedia" \
+            --after-install packaging/postinst \
+            --after-remove packaging/postrm \
+            --package dist/ \
+            "dist/qmediacenter/=/opt/qmediacenter/" \
+            "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
+            "data/qmediacenter.png=/usr/share/pixmaps/qmediacenter.png"
+      - name: List built packages
+        run: ls -lh dist/*.deb dist/*.rpm
+      - name: Upload packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            dist/*.deb
+            dist/*.rpm
+          retention-days: 7
+
+  # ── Smoke test: install .deb on Ubuntu 24.04 ──────────────────────────────
   smoke-deb:
     name: Install .deb — Ubuntu 24.04
     runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch'
+    needs: build
     steps:
-      - name: Download latest release package
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release download --repo ${{ github.repository }} --pattern "*.deb"
-      - name: Install libmpv (dependency)
-        run: sudo apt-get update -q && sudo apt-get install -y libmpv2 || sudo apt-get install -y libmpv1
-      - name: Install .deb package
-        run: sudo dpkg -i qmediacenter_amd64.deb || (sudo apt-get install -f -y && sudo dpkg -i qmediacenter_amd64.deb)
-      - name: Verify binary exists
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist/
+      - name: Install libmpv
+        run: sudo apt-get update -q && sudo apt-get install -y libmpv2
+      - name: Install .deb
+        run: sudo dpkg -i dist/*.deb
+      - name: Verify binary exists and is executable
         run: test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
+      - name: Verify desktop file installed
+        run: test -f /usr/share/applications/io.github.ycderman.qmediacenter.desktop && echo "Desktop OK"
+      - name: Verify symlink
+        run: test -L /usr/local/bin/qmediacenter && echo "Symlink OK"
       - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
         run: |
-          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter
-          EXIT=$?
-          echo "Exit code: $EXIT"
-          # 124 = killed by timeout (app was running — good)
-          # 0   = clean exit (good)
-          # 134 = SIGABRT, 139 = SIGSEGV (bad)
-          if [ "$EXIT" -eq 134 ] || [ "$EXIT" -eq 139 ]; then
-            echo "FAIL: process crashed (signal $EXIT)"; exit 1
+          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter || EXIT=$?
+          echo "Exit code: ${EXIT:-0}"
+          if [ "${EXIT:-0}" -eq 134 ] || [ "${EXIT:-0}" -eq 139 ]; then
+            echo "FAIL: process crashed"; exit 1
           fi
           echo "PASS"
 
+  # ── Smoke test: install .rpm on Fedora 41 ─────────────────────────────────
   smoke-rpm:
     name: Install .rpm — Fedora 41
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    needs: build
     container: fedora:41
     steps:
-      - name: Install tools
-        run: dnf install -y curl libcurl jq
-      - name: Download latest release package
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          URL=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
-            | jq -r '.assets[] | select(.name | endswith(".rpm")) | .browser_download_url')
-          curl -fsSL -o package.rpm "$URL"
-      - name: Install .rpm package
-        run: |
-          dnf install -y mpv-libs
-          dnf install -y ./package.rpm
-      - name: Verify binary exists
+      - name: Install container tools
+        run: dnf install -y findutils
+      - name: Download built packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist/
+      - name: Install mpv-libs
+        run: dnf install -y mpv-libs
+      - name: Install .rpm
+        run: dnf install -y dist/*.rpm
+      - name: Verify binary exists and is executable
         run: test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
       - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
         run: |
-          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter
-          EXIT=$?
-          echo "Exit code: $EXIT"
-          if [ "$EXIT" -eq 134 ] || [ "$EXIT" -eq 139 ]; then
-            echo "FAIL: process crashed (signal $EXIT)"; exit 1
+          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter || EXIT=$?
+          echo "Exit code: ${EXIT:-0}"
+          if [ "${EXIT:-0}" -eq 134 ] || [ "${EXIT:-0}" -eq 139 ]; then
+            echo "FAIL: process crashed"; exit 1
           fi
           echo "PASS"
