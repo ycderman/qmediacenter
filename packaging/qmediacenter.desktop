@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=QMediaCenter
-Comment=Qt6/mpv media center — IPTV + local/network library
+Comment=Qt6/mpv media center — IPTV, Emby, Plex + local/network library
 Exec=/opt/qmediacenter/qmediacenter
 Icon=qmediacenter
 Terminal=false

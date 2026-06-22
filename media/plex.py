@@ -11,7 +11,7 @@ import requests
 
 log = logging.getLogger(__name__)
 
-UA = "QMediaCenter/0.1"
+UA = "QMediaCenter/0.2"
 _TYPE_MOVIE = 1
 _TYPE_EPISODE = 4
 

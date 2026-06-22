@@ -3,7 +3,7 @@
 # NixOS: nix-shell -p ruby.gems.fpm python3Packages.pyinstaller
 set -euo pipefail
 
-VERSION="${1:-0.1.0}"
+VERSION="${1:-0.2.0}"
 ARCH="x86_64"
 DIST="dist/qmediacenter"
 
@@ -17,7 +17,7 @@ fpm -s dir -t deb \
   -n qmediacenter \
   -v "$VERSION" \
   -a "$ARCH" \
-  --description "Qt6/mpv media center — IPTV + local/network library" \
+  --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
   --url "https://github.com/ycderman/qmediacenter" \
   --license MIT \
   --depends "libmpv1 | libmpv2" \
@@ -35,7 +35,7 @@ fpm -s dir -t rpm \
   -n qmediacenter \
   -v "$VERSION" \
   -a "$ARCH" \
-  --description "Qt6/mpv media center — IPTV + local/network library" \
+  --description "Qt6/mpv media center — IPTV, Emby, Plex + local/network library" \
   --url "https://github.com/ycderman/qmediacenter" \
   --license MIT \
   --depends "mpv-libs" \
