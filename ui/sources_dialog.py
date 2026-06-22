@@ -127,11 +127,8 @@ class SourcesDialog(QDialog):
         ef = QFormLayout()
         self.emby_url = QLineEdit(emby.get("url", "")); self.emby_url.setPlaceholderText("http://host:8096")
         self.emby_key = QLineEdit(emby.get("api_key", "")); self.emby_key.setEchoMode(QLineEdit.Password)
-        self.emby_user = QLineEdit(emby.get("user_id", ""))
-        self.emby_user.setPlaceholderText("username or UUID (blank = first user)")
         ef.addRow("Server URL", self.emby_url)
         ef.addRow("API key", self.emby_key)
-        ef.addRow("Username", self.emby_user)
         v.addLayout(ef)
 
         v.addSpacing(12)
@@ -180,8 +177,7 @@ class SourcesDialog(QDialog):
             "tmdb_key": self.tmdb_key.text().strip(),
             "omdb_key": self.omdb_key.text().strip(),
             "emby": {"url": self.emby_url.text().strip(),
-                     "api_key": self.emby_key.text().strip(),
-                     "user_id": self.emby_user.text().strip()},
+                     "api_key": self.emby_key.text().strip()},
             "plex": {"url": self.plex_url.text().strip(),
                      "token": self.plex_token.text().strip()},
         }
