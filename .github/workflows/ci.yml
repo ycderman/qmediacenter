@@ -115,6 +115,11 @@ jobs:
         with:
           name: bundle
           path: dist/qmediacenter/
+      - name: Restore permissions
+        run: |
+          chmod +x dist/qmediacenter/qmediacenter
+          echo "Binary mode: $(stat -c %a dist/qmediacenter/qmediacenter)"
+          ls dist/qmediacenter/ | head -5
       - name: Install fpm
         run: |
           sudo apt-get update -q
@@ -159,6 +164,11 @@ jobs:
         with:
           name: bundle
           path: dist/qmediacenter/
+      - name: Restore permissions
+        run: |
+          chmod +x dist/qmediacenter/qmediacenter
+          echo "Binary mode: $(stat -c %a dist/qmediacenter/qmediacenter)"
+          ls dist/qmediacenter/ | head -5
       - name: Install fpm
         run: |
           dnf install -y ruby ruby-devel gcc make rpm-build redhat-rpm-config
