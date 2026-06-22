@@ -15,6 +15,7 @@ a = Analysis(
 _EXCLUDE_PREFIXES = (
     'libstdc++', 'libgcc_s', 'libgcc',
     'libssl', 'libcrypto',
+    'libva', 'libdrm',
     'libc.', 'libm.', 'libdl.', 'libpthread.', 'librt.',
 )
 a.binaries = [b for b in a.binaries
