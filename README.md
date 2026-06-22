@@ -26,11 +26,15 @@
 
 ## Screenshots
 
-| Home | Library |
-|------|---------|
-| ![Home](docs/img/home.png) | ![Library](docs/img/library.png) |
-| **Detail** | **Sources** |
-| ![Detail](docs/img/detail.png) | ![Sources](docs/img/sources.png) |
+| Home — source-tagged rows | MyMedia — local library |
+|---------------------------|-------------------------|
+| ![Home](docs/img/home.png) | ![MyMedia](docs/img/mymedia.png) |
+| **IPTV — Live · Movies · Series · Downloads** | **Detail** |
+| ![IPTV](docs/img/iptv.png) | ![Detail](docs/img/detail.png) |
+
+| Sources |
+|---------|
+| ![Sources](docs/img/sources.png) |
 
 ## Installation
 
