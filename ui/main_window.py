@@ -42,6 +42,15 @@ _MYMEDIA_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"
   <rect x="27" y="81" width="46" height="7" rx="3" fill="#546E7A"/>
 </svg>"""
 
+_IPTV_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="5" y="16" width="90" height="58" rx="7" fill="#37474F"/>
+  <rect x="13" y="24" width="74" height="42" rx="4" fill="#0D47A1"/>
+  <line x1="34" y1="16" x2="18" y2="4" stroke="#37474F" stroke-width="8" stroke-linecap="round"/>
+  <line x1="66" y1="16" x2="82" y2="4" stroke="#37474F" stroke-width="8" stroke-linecap="round"/>
+  <rect x="40" y="74" width="20" height="8" rx="2" fill="#37474F"/>
+  <rect x="30" y="82" width="40" height="7" rx="3" fill="#37474F"/>
+</svg>"""
+
 
 class Worker(QThread):
     done = Signal(object)
@@ -126,21 +135,23 @@ class MainWindow(QMainWindow):
         self.btn_home.clicked.connect(self._show_home)
         nav.addWidget(self.btn_home)
         self.btn_mymedia = QPushButton(" MyMedia"); self.btn_mymedia.setCheckable(True)
-        self.btn_mymedia.setIcon(self._svg_icon(_MYMEDIA_SVG, 24))
-        self.btn_mymedia.setIconSize(QSize(24, 24))
+        self.btn_mymedia.setIcon(self._svg_icon(_MYMEDIA_SVG, 18))
+        self.btn_mymedia.setIconSize(QSize(18, 18))
         self.btn_mymedia.clicked.connect(self._show_mymedia)
         nav.addWidget(self.btn_mymedia)
         self.btn_emby = QPushButton(" Emby"); self.btn_emby.setCheckable(True)
-        self.btn_emby.setIcon(self._svg_icon(_EMBY_SVG, 24))
-        self.btn_emby.setIconSize(QSize(24, 24))
+        self.btn_emby.setIcon(self._svg_icon(_EMBY_SVG, 18))
+        self.btn_emby.setIconSize(QSize(18, 18))
         self.btn_emby.clicked.connect(self._show_emby)
         nav.addWidget(self.btn_emby)
         self.btn_plex = QPushButton(" Plex"); self.btn_plex.setCheckable(True)
-        self.btn_plex.setIcon(self._svg_icon(_PLEX_SVG, 24))
-        self.btn_plex.setIconSize(QSize(24, 24))
+        self.btn_plex.setIcon(self._svg_icon(_PLEX_SVG, 18))
+        self.btn_plex.setIconSize(QSize(18, 18))
         self.btn_plex.clicked.connect(self._show_plex)
         nav.addWidget(self.btn_plex)
-        self.btn_iptv = QPushButton("📺 IPTV"); self.btn_iptv.setCheckable(True)
+        self.btn_iptv = QPushButton(" IPTV"); self.btn_iptv.setCheckable(True)
+        self.btn_iptv.setIcon(self._svg_icon(_IPTV_SVG, 18))
+        self.btn_iptv.setIconSize(QSize(18, 18))
         self.btn_iptv.clicked.connect(self._show_iptv)
         nav.addWidget(self.btn_iptv)
         nav.addStretch()
