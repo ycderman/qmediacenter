@@ -1291,6 +1291,11 @@ class MainWindow(QMainWindow):
                 self._position_controls()
             elif ev.type() == QEvent.MouseMove:
                 self._wake_controls()
+            elif ev.type() == QEvent.Wheel:
+                delta = ev.angleDelta().y()
+                if delta != 0:
+                    self.player.seek(10 if delta > 0 else -10, "relative")
+                return True
         elif obj is self.controls_bar and ev.type() == QEvent.MouseMove:
             # keep the bar alive while the pointer hovers over it
             if self._fs:
