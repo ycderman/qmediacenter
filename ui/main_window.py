@@ -67,6 +67,7 @@ class MainWindow(QMainWindow):
         self._all_streams = {}          # mode -> full catalog (cached for name search)
         self._workers = []
         self._fs = False
+        self._lib_source = None
 
         self.downloads = DownloadManager(
             self.settings.get("download_dir") or config.download_dir(), self)
@@ -105,16 +106,18 @@ class MainWindow(QMainWindow):
         self.btn_home = QPushButton("🏠 Home"); self.btn_home.setCheckable(True)
         self.btn_home.clicked.connect(self._show_home)
         nav.addWidget(self.btn_home)
-        self.btn_live = QPushButton("📺 Live")
-        self.btn_vod = QPushButton("🎬 Movies")
-        self.btn_series = QPushButton("📺 Series")
-        for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
-            b.setCheckable(True)
-            b.clicked.connect(lambda _=False, mm=m: self._set_mode(mm))
-            nav.addWidget(b)
-        self.btn_library = QPushButton("📚 Library"); self.btn_library.setCheckable(True)
-        self.btn_library.clicked.connect(self._show_library)
-        nav.addWidget(self.btn_library)
+        self.btn_mymedia = QPushButton("🗂 MyMedia"); self.btn_mymedia.setCheckable(True)
+        self.btn_mymedia.clicked.connect(self._show_mymedia)
+        nav.addWidget(self.btn_mymedia)
+        self.btn_iptv = QPushButton("📺 IPTV"); self.btn_iptv.setCheckable(True)
+        self.btn_iptv.clicked.connect(self._show_iptv)
+        nav.addWidget(self.btn_iptv)
+        self.btn_emby = QPushButton("🟢 Emby"); self.btn_emby.setCheckable(True)
+        self.btn_emby.clicked.connect(self._show_emby)
+        nav.addWidget(self.btn_emby)
+        self.btn_plex = QPushButton("🟡 Plex"); self.btn_plex.setCheckable(True)
+        self.btn_plex.clicked.connect(self._show_plex)
+        nav.addWidget(self.btn_plex)
         self.btn_downloads = QPushButton("⬇ Downloads"); self.btn_downloads.setCheckable(True)
         self.btn_downloads.clicked.connect(self._show_downloads)
         nav.addWidget(self.btn_downloads)
@@ -123,6 +126,24 @@ class MainWindow(QMainWindow):
         self.btn_sources.clicked.connect(self._open_sources)
         nav.addWidget(self.btn_sources)
         outer.addWidget(self.nav_bar)
+
+        # IPTV sub-navigation — shown only when IPTV is active
+        self.iptv_subnav = QWidget()
+        iptv_sub = QHBoxLayout(self.iptv_subnav)
+        iptv_sub.setContentsMargins(20, 2, 4, 2)
+        iptv_name_lbl = QLabel(f"● {self.profile['name']}")
+        iptv_name_lbl.setObjectName("Meta")
+        iptv_sub.addWidget(iptv_name_lbl)
+        self.btn_live = QPushButton("📡 Live")
+        self.btn_vod = QPushButton("🎬 Movies")
+        self.btn_series = QPushButton("📺 Series")
+        for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
+            b.setCheckable(True)
+            b.clicked.connect(lambda _=False, mm=m: self._set_mode(mm))
+            iptv_sub.addWidget(b)
+        iptv_sub.addStretch()
+        self.iptv_subnav.setVisible(False)
+        outer.addWidget(self.iptv_subnav)
 
         self.pages = QStackedWidget()
         outer.addWidget(self.pages, 1)
@@ -307,18 +328,43 @@ class MainWindow(QMainWindow):
         v.addWidget(self.lib_list, 1)
         return page
 
-    def _show_library(self):
-        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_home, self.btn_downloads):
-            b.setChecked(False)
-        self.btn_library.setChecked(True)
-        self.pages.setCurrentWidget(self.library_page)
-        self._populate_library()
+    def _nav_select(self, active_btn):
+        for b in (self.btn_home, self.btn_mymedia, self.btn_iptv,
+                  self.btn_emby, self.btn_plex, self.btn_downloads):
+            b.setChecked(b is active_btn)
+        self.iptv_subnav.setVisible(active_btn is self.btn_iptv)
 
-    def _populate_library(self):
+    def _show_mymedia(self):
+        self._nav_select(self.btn_mymedia)
+        self.pages.setCurrentWidget(self.library_page)
+        self._populate_library(source="local")
+
+    def _show_emby(self):
+        self._nav_select(self.btn_emby)
+        self.pages.setCurrentWidget(self.library_page)
+        self._populate_library(source="emby")
+
+    def _show_plex(self):
+        self._nav_select(self.btn_plex)
+        self.pages.setCurrentWidget(self.library_page)
+        self._populate_library(source="plex")
+
+    def _show_iptv(self):
+        self._nav_select(self.btn_iptv)
+        if self.mode not in ("live", "vod", "series"):
+            self.mode = "live"
+        self._set_mode(self.mode)
+
+    def _populate_library(self, source=None):
+        if source is not None:
+            self._lib_source = source
+        source = getattr(self, "_lib_source", None)
         kind = self.lib_kind.currentData()
-        items = self.db.media(kind=kind, order="recent")
+        items = self.db.media(kind=kind, source=source, order="recent")
         self.lib_list.clear()
-        self.lib_header.setText(f"Library — {len(items)} items")
+        src_names = {"local": "MyMedia", "emby": "Emby", "plex": "Plex"}
+        hdr = src_names.get(source, "Library") if source else "Library"
+        self.lib_header.setText(f"{hdr} — {len(items)} items")
         for d in items:
             label = d.get("title") or "?"
             if d.get("year"):
@@ -414,9 +460,7 @@ class MainWindow(QMainWindow):
         return scroll
 
     def _show_home(self):
-        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_library, self.btn_downloads):
-            b.setChecked(False)
-        self.btn_home.setChecked(True)
+        self._nav_select(self.btn_home)
         self.pages.setCurrentWidget(self.home_page)
         self._populate_home()
 
@@ -426,13 +470,23 @@ class MainWindow(QMainWindow):
             it = self.home_vbox.takeAt(0)
             if it.widget():
                 it.widget().deleteLater()
+
+        from collections import defaultdict
+        all_movies = self.db.media(kind="movie", limit=40)
+        movies_by_src = defaultdict(list)
+        for item in all_movies:
+            movies_by_src[item.get("source", "local")].append(item)
+        src_names = {"local": "MyMedia", "emby": "Emby", "plex": "Plex"}
+
         rows = [
             ("▶  Continue Watching", self.db.continue_watching(20)),
             ("⭐  Favorites", self.db.favorites(40)),
             ("🆕  Recently Added", self.db.media(order="recent", limit=40)),
-            ("🎬  Movies", self.db.media(kind="movie", limit=40)),
-            ("📺  TV", self.db.media(kind="episode", limit=40)),
         ]
+        for src, items in movies_by_src.items():
+            rows.append((f"🎬  Movies — {src_names.get(src, src.title())}", items))
+        rows.append(("📺  TV", self.db.media(kind="episode", limit=40)))
+
         any_row = False
         for title, items in rows:
             if items:
@@ -461,9 +515,13 @@ class MainWindow(QMainWindow):
         strip.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         strip.setUniformItemSizes(True)
         strip.setWordWrap(True)
+        _src_badge = {"emby": " [Emby]", "plex": " [Plex]", "xtream": " [IPTV]"}
         for d in items:
             label = d.get("title") or "?"
             extra = d.get("extra") or {}
+            src = d.get("source", "")
+            if src and src != "local":
+                label += _src_badge.get(src, f" [{src.title()}]")
             if d.get("year"):
                 label += f"  ({d['year']})"
             pos, dur = (d.get("position"), d.get("duration"))
@@ -547,9 +605,7 @@ class MainWindow(QMainWindow):
     def _set_mode(self, mode):
         self.mode = mode
         self.viewing_series = None
-        self.btn_library.setChecked(False)
-        self.btn_home.setChecked(False)
-        self.btn_downloads.setChecked(False)
+        self._nav_select(self.btn_iptv)
         for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
             b.setChecked(m == mode)
         grid = mode in ("vod", "series")
@@ -952,9 +1008,7 @@ class MainWindow(QMainWindow):
         return page
 
     def _show_downloads(self):
-        for b in (self.btn_live, self.btn_vod, self.btn_series, self.btn_library, self.btn_home):
-            b.setChecked(False)
-        self.btn_downloads.setChecked(True)
+        self._nav_select(self.btn_downloads)
         self.btn_downloads.setStyleSheet("")   # seen
         self.pages.setCurrentWidget(self.downloads_page)
 
@@ -1158,8 +1212,10 @@ class MainWindow(QMainWindow):
 
     def _enter_fullscreen(self):
         self._fs = True
+        self._iptv_subnav_was_visible = self.iptv_subnav.isVisible()
         self.pages.setCurrentWidget(self.watch_page)
-        self.nav_bar.hide(); self.btn_content.hide(); self.info_card.hide()
+        self.nav_bar.hide(); self.iptv_subnav.hide()
+        self.btn_content.hide(); self.info_card.hide()
         self.centralWidget().layout().setContentsMargins(0, 0, 0, 0)
         self.watch_layout.setContentsMargins(0, 0, 0, 0)
         self.right.setHandleWidth(0)
@@ -1172,6 +1228,8 @@ class MainWindow(QMainWindow):
         self._fs = False
         self._controls_timer.stop()
         self.nav_bar.show(); self.btn_content.show(); self.info_card.show()
+        if getattr(self, "_iptv_subnav_was_visible", False):
+            self.iptv_subnav.show()
         self.centralWidget().layout().setContentsMargins(8, 8, 8, 8)
         self.watch_layout.setContentsMargins(4, 4, 4, 4)
         self.right.setHandleWidth(5)
