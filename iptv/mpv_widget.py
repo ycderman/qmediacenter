@@ -1,14 +1,14 @@
-"""Embedded libmpv player rendered into a Qt OpenGL widget.
+"""Embedded libmpv player using QOpenGLWindow + createWindowContainer.
 
-Uses libmpv's render API (OpenGL) so it works on both Wayland and X11 —
-unlike `--wid` embedding which only works under X11. mpv handles every
-codec (HEVC, AC3/E-AC3, DTS, ...) with VAAPI hardware decoding.
+QOpenGLWindow gets Qt's dedicated render thread — paintGL() is never blocked
+by the main event loop. This eliminates the mpv_render_context_render() stall
+that plagues QOpenGLWidget-based implementations.
 """
 import mpv
-from OpenGL import GL
-from PySide6.QtOpenGLWidgets import QOpenGLWidget
+from PySide6.QtOpenGL import QOpenGLWindow
 from PySide6.QtGui import QOpenGLContext
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtCore import Qt, Signal, QObject
 
 
 def _get_proc_address(_ctx, name):
@@ -19,102 +19,132 @@ def _get_proc_address(_ctx, name):
     return int(glctx.getProcAddress(name))
 
 
-class MpvWidget(QOpenGLWidget):
-    """A QOpenGLWidget that draws an mpv video surface."""
-
-    # Emitted (from the GUI thread) whenever mpv signals a new frame is ready.
-    _frame_ready = Signal()
-
+class _MpvSignals(QObject):
+    """Signals must live on a QObject; QOpenGLWindow inherits QWindow, not QObject
+    in the signal sense we need for cross-thread emit."""
+    frame_ready    = Signal()
     duration_changed = Signal(float)
     position_changed = Signal(float)
-    pause_changed = Signal(bool)
-    info_changed = Signal(str)        # e.g. "vaapi · 3840x2160"
-    tracks_changed = Signal(list)     # list of mpv track-list dicts
+    pause_changed    = Signal(bool)
+    info_changed     = Signal(str)
+    tracks_changed   = Signal(list)
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._mpv = mpv.MPV(
-            vo="libmpv",
-            hwdec="auto-safe",            # VAAPI (UHD 620) when safe; never breaks playback
-            profile="fast",               # cheap scaler — critical for 4K→1080p on iGPU
-            ytdl=False,
-            osc=False,
-            input_default_bindings=False,
-            cache="yes",
-            demuxer_max_bytes="200MiB",   # bigger buffer for high-bitrate 4K streams
-            demuxer_max_back_bytes="100MiB",
-            user_agent="QtIPTV/0.1",
-        )
-        self._alive = True
-        self._hwdec = "?"
-        self._vw = self._vh = 0
-        self._mpv.observe_property("hwdec-current", self._on_hwdec)
-        self._mpv.observe_property("video-params/w", self._on_vparam)
-        self._mpv.observe_property("video-params/h", self._on_vparam)
+
+class _MpvGLWindow(QOpenGLWindow):
+    """Inner OpenGL window; paintGL runs in Qt's dedicated render thread."""
+
+    def __init__(self, mpv_instance, signals: _MpvSignals):
+        super().__init__()
+        self._mpv = mpv_instance
+        self._sig = signals
         self._render_ctx = None
-        self._frame_ready.connect(self.update)
+        self._alive = True
+        # frame_ready → update() wired after construction (same thread)
 
-        # observers -> Qt signals (marshalled via the queued _frame_ready style)
-        self._mpv.observe_property("duration", self._on_duration)
-        self._mpv.observe_property("time-pos", self._on_time_pos)
-        self._mpv.observe_property("pause", self._on_pause)
-        self._mpv.observe_property("track-list", self._on_tracks)
-
-        # Fallback timer: main thread'den bağımsız olarak 60fps'de render zorla.
-        # update_cb gecikmeli gelirse frame drop olmaz.
-        self._render_timer = QTimer(self)
-        self._render_timer.setInterval(16)
-        self._render_timer.timeout.connect(self.update)
-        self._render_timer.start()
-
-    # ---- GL lifecycle -------------------------------------------------
     def initializeGL(self):
         try:
-            # Must be a ctypes CFUNCTYPE instance; keep a ref so it isn't GC'd.
             self._proc_addr_cb = mpv.MpvGlGetProcAddressFn(_get_proc_address)
             self._render_ctx = mpv.MpvRenderContext(
                 self._mpv,
                 "opengl",
                 opengl_init_params={"get_proc_address": self._proc_addr_cb},
             )
-            # mpv calls this from a non-GUI thread; just ask Qt to repaint.
-            self._render_ctx.update_cb = lambda: self._alive and self._frame_ready.emit()
+            # mpv calls update_cb from its own thread; update() is thread-safe on QWindow
+            self._render_ctx.update_cb = lambda: self._alive and self.update()
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("MpvRenderContext init failed: %s", e)
-            self._render_ctx = None
 
     def paintGL(self):
         if self._render_ctx is None:
             return
-        ratio = self.devicePixelRatioF()
+        ratio = self.devicePixelRatio()
         w = int(self.width() * ratio)
         h = int(self.height() * ratio)
-        fbo = self.defaultFramebufferObject()
         self._render_ctx.render(
             flip_y=True,
-            opengl_fbo={"w": w, "h": h, "fbo": fbo},
+            opengl_fbo={"w": w, "h": h, "fbo": 0},
         )
 
-    # ---- property callbacks ------------------------------------------
-    # NB: never query mpv here (no self._mpv.<prop>) — doing so during teardown
-    # races with mpv.terminate() and segfaults. Use the observed value only.
+    def shutdown(self):
+        self._alive = False
+        if self._render_ctx is not None:
+            try:
+                self._render_ctx.free()
+            except Exception:
+                pass
+            self._render_ctx = None
+
+
+class MpvWidget(QWidget):
+    """Public widget — embeds _MpvGLWindow via createWindowContainer."""
+
+    duration_changed = Signal(float)
+    position_changed = Signal(float)
+    pause_changed    = Signal(bool)
+    info_changed     = Signal(str)
+    tracks_changed   = Signal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self._sig = _MpvSignals()
+        self._hwdec = "?"
+        self._vw = self._vh = 0
+        self._alive = True
+
+        self._mpv = mpv.MPV(
+            vo="libmpv",
+            hwdec="auto-safe",
+            profile="fast",
+            ytdl=False,
+            osc=False,
+            input_default_bindings=False,
+            cache="yes",
+            demuxer_max_bytes="200MiB",
+            demuxer_max_back_bytes="100MiB",
+            user_agent="QtIPTV/0.1",
+        )
+
+        self._mpv.observe_property("hwdec-current",  self._on_hwdec)
+        self._mpv.observe_property("video-params/w", self._on_vparam)
+        self._mpv.observe_property("video-params/h", self._on_vparam)
+        self._mpv.observe_property("duration",    self._on_duration)
+        self._mpv.observe_property("time-pos",    self._on_time_pos)
+        self._mpv.observe_property("pause",       self._on_pause)
+        self._mpv.observe_property("track-list",  self._on_tracks)
+
+        self._gl_window = _MpvGLWindow(self._mpv, self._sig)
+        container = QWidget.createWindowContainer(self._gl_window, self)
+        container.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(container)
+
+        # Forward signals from inner QObject to widget's public signals
+        self._sig.duration_changed.connect(self.duration_changed)
+        self._sig.position_changed.connect(self.position_changed)
+        self._sig.pause_changed.connect(self.pause_changed)
+        self._sig.info_changed.connect(self.info_changed)
+        self._sig.tracks_changed.connect(self.tracks_changed)
+
+    # ---- property callbacks (called from mpv thread) ------------------
     def _on_duration(self, _name, value):
         if self._alive and value is not None:
-            self.duration_changed.emit(float(value))
+            self._sig.duration_changed.emit(float(value))
 
     def _on_time_pos(self, _name, value):
         if self._alive and value is not None:
-            self.position_changed.emit(float(value))
+            self._sig.position_changed.emit(float(value))
 
     def _on_pause(self, _name, value):
         if self._alive:
-            self.pause_changed.emit(bool(value))
+            self._sig.pause_changed.emit(bool(value))
 
     def _on_tracks(self, _name, value):
-        # Marshalled from mpv's thread; just forward the observed list.
         if self._alive:
-            self.tracks_changed.emit(list(value) if value else [])
+            self._sig.tracks_changed.emit(list(value) if value else [])
 
     def _on_hwdec(self, _name, value):
         if not self._alive:
@@ -136,7 +166,7 @@ class MpvWidget(QOpenGLWidget):
         vparams = f"{self._vw}x{self._vh}" if self._vw and self._vh else ""
         parts = [p for p in (self._hwdec, vparams) if p and p != "?"]
         if parts:
-            self.info_changed.emit(" · ".join(parts))
+            self._sig.info_changed.emit(" · ".join(parts))
 
     # ---- public API ---------------------------------------------------
     def play(self, url):
@@ -156,8 +186,6 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.pause = paused
 
     def seek(self, seconds, reference="absolute"):
-        # Use the 2-arg form ('seek <target> <flags>'); python-mpv's seek()
-        # appends a precision arg that mpv rejects, so the seek silently fails.
         try:
             self._mpv.command("seek", seconds, reference)
         except Exception:
@@ -167,29 +195,20 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.volume = max(0, min(150, volume))
 
     def set_audio(self, aid):
-        # aid: an integer track id, or "auto"/"no"
         try:
             self._mpv.aid = aid
         except Exception:
             pass
 
     def set_subtitle(self, sid):
-        # sid: an integer track id, or "no" to disable subtitles
         try:
             self._mpv.sid = sid
         except Exception:
             pass
 
     def shutdown(self):
-        # Stop callbacks from touching mpv before we tear it down (avoids SEGV).
         self._alive = False
-        if self._render_ctx is not None:
-            try:
-                self.makeCurrent()
-                self._render_ctx.free()
-            except Exception:
-                pass
-            self._render_ctx = None
+        self._gl_window.shutdown()
         try:
             self._mpv.terminate()
         except Exception:
