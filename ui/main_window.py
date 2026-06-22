@@ -26,12 +26,20 @@ POSTER = QSize(132, 198)
 
 _EMBY_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <circle cx="50" cy="50" r="50" fill="#52B54B"/>
-  <polygon points="30,25 30,75 75,50" fill="white"/>
+  <polygon points="35,25 35,75 80,50" fill="white"/>
 </svg>"""
 
 _PLEX_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="12" fill="#1F1F1F"/>
-  <polygon points="28,18 28,82 80,50" fill="#E5A00D"/>
+  <rect width="100" height="100" rx="14" fill="#1F1F1F"/>
+  <polygon points="35,25 35,75 80,50" fill="#E5A00D"/>
+</svg>"""
+
+_MYMEDIA_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="4" y="12" width="92" height="62" rx="7" fill="#546E7A"/>
+  <rect x="12" y="20" width="76" height="46" rx="4" fill="#263238"/>
+  <polygon points="38,31 38,57 66,44" fill="white" opacity="0.9"/>
+  <rect x="37" y="74" width="26" height="7" rx="2" fill="#546E7A"/>
+  <rect x="27" y="81" width="46" height="7" rx="3" fill="#546E7A"/>
 </svg>"""
 
 
@@ -117,15 +125,19 @@ class MainWindow(QMainWindow):
         self.btn_home = QPushButton("🏠 Home"); self.btn_home.setCheckable(True)
         self.btn_home.clicked.connect(self._show_home)
         nav.addWidget(self.btn_home)
-        self.btn_mymedia = QPushButton("🗂 MyMedia"); self.btn_mymedia.setCheckable(True)
+        self.btn_mymedia = QPushButton(" MyMedia"); self.btn_mymedia.setCheckable(True)
+        self.btn_mymedia.setIcon(self._svg_icon(_MYMEDIA_SVG, 24))
+        self.btn_mymedia.setIconSize(QSize(24, 24))
         self.btn_mymedia.clicked.connect(self._show_mymedia)
         nav.addWidget(self.btn_mymedia)
         self.btn_emby = QPushButton(" Emby"); self.btn_emby.setCheckable(True)
-        self.btn_emby.setIcon(self._svg_icon(_EMBY_SVG))
+        self.btn_emby.setIcon(self._svg_icon(_EMBY_SVG, 24))
+        self.btn_emby.setIconSize(QSize(24, 24))
         self.btn_emby.clicked.connect(self._show_emby)
         nav.addWidget(self.btn_emby)
         self.btn_plex = QPushButton(" Plex"); self.btn_plex.setCheckable(True)
-        self.btn_plex.setIcon(self._svg_icon(_PLEX_SVG))
+        self.btn_plex.setIcon(self._svg_icon(_PLEX_SVG, 24))
+        self.btn_plex.setIconSize(QSize(24, 24))
         self.btn_plex.clicked.connect(self._show_plex)
         nav.addWidget(self.btn_plex)
         self.btn_iptv = QPushButton("📺 IPTV"); self.btn_iptv.setCheckable(True)
@@ -557,7 +569,7 @@ class MainWindow(QMainWindow):
         return box
 
     @staticmethod
-    def _svg_icon(svg_bytes: bytes, size: int = 20) -> QIcon:
+    def _svg_icon(svg_bytes: bytes, size: int = 24) -> QIcon:
         renderer = QSvgRenderer(QByteArray(svg_bytes))
         pm = QPixmap(size, size)
         pm.fill(Qt.transparent)
