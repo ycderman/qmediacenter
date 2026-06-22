@@ -8,7 +8,7 @@ import mpv
 from OpenGL import GL
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtGui import QOpenGLContext
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 
 
 def _get_proc_address(_ctx, name):
@@ -59,6 +59,13 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.observe_property("time-pos", self._on_time_pos)
         self._mpv.observe_property("pause", self._on_pause)
         self._mpv.observe_property("track-list", self._on_tracks)
+
+        # Fallback timer: main thread'den bağımsız olarak 60fps'de render zorla.
+        # update_cb gecikmeli gelirse frame drop olmaz.
+        self._render_timer = QTimer(self)
+        self._render_timer.setInterval(16)
+        self._render_timer.timeout.connect(self.update)
+        self._render_timer.start()
 
     # ---- GL lifecycle -------------------------------------------------
     def initializeGL(self):
