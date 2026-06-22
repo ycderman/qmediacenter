@@ -10,10 +10,15 @@ a = Analysis(
     noarchive=False,
 )
 
-# Drop bundled libstdc++/libgcc so the system version (which matches the
-# system's libavfilter/libmpv) is used instead of the older build-host one.
+# Exclude system libraries that vary by distro/version; let the OS supply them.
+# Bundling these causes GLIBCXX / OPENSSL version conflicts on newer targets.
+_EXCLUDE_PREFIXES = (
+    'libstdc++', 'libgcc_s', 'libgcc',
+    'libssl', 'libcrypto',
+    'libc.', 'libm.', 'libdl.', 'libpthread.', 'librt.',
+)
 a.binaries = [b for b in a.binaries
-              if not b[0].startswith(('libstdc++', 'libgcc_s', 'libgcc'))]
+              if not any(b[0].startswith(p) for p in _EXCLUDE_PREFIXES)]
 
 pyz = PYZ(a.pure)
 
