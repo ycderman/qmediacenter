@@ -96,6 +96,7 @@ class MainWindow(QMainWindow):
         self._workers = []
         self._fs = False
         self._lib_source = None
+        self.mpris = None
 
         self.downloads = DownloadManager(
             self.settings.get("download_dir") or config.download_dir(), self)
@@ -869,6 +870,8 @@ class MainWindow(QMainWindow):
         self.player.stop()
         self._current_key = None
         self.setWindowTitle(self._base_title)
+        if self.mpris:
+            self.mpris.on_stop()
         self._show_content()
 
     def _open_series(self, series):
@@ -919,6 +922,8 @@ class MainWindow(QMainWindow):
         self.pos_slider.setValue(0)
         self.player.play(url)
         self._show_controls()
+        if self.mpris:
+            self.mpris.on_play(title)
 
     def _play_item(self, d):
         """Play a media/progress/favorite row dict from the home screen."""

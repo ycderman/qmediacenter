@@ -7,6 +7,8 @@ let
     pyopengl
     requests
     yt-dlp
+    dbus-python  # MPRIS2 for KDE Connect
+    pygobject3   # GLib main loop for dbus-python
   ]);
 in
 pkgs.stdenv.mkDerivation {

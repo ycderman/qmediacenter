@@ -13,6 +13,7 @@ from iptv import config
 from iptv.xtream import XtreamClient
 from ui.login_dialog import LoginDialog
 from ui.main_window import MainWindow
+from media.mpris import MprisAdapter
 
 
 def _rounded_icon(path, size=256):
@@ -70,6 +71,7 @@ def main():
         profile, client = login.profile, login.client
 
     win = MainWindow(profile, client)
+    win.mpris = MprisAdapter(win.player)
     win.show()
     return app.exec()
 
