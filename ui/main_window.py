@@ -35,13 +35,18 @@ def _apply_watched_badge(pixmap):
     bar_h = max(28, pixmap.height() // 6)
     p.fillRect(0, pixmap.height() - bar_h, pixmap.width(), bar_h,
                QColor(0, 0, 0, 170))
-    p.setPen(QColor(255, 255, 255))
     font = QFont()
     font.setPointSize(9)
     font.setBold(True)
     p.setFont(font)
-    p.drawText(0, pixmap.height() - bar_h, pixmap.width(), bar_h,
-               Qt.AlignCenter, "✓ İzlendi")
+    # green tick
+    p.setPen(QColor(80, 220, 80))
+    tick_w = pixmap.width() // 3
+    p.drawText(0, pixmap.height() - bar_h, tick_w, bar_h, Qt.AlignCenter, "✓")
+    # white label
+    p.setPen(QColor(255, 255, 255))
+    p.drawText(tick_w, pixmap.height() - bar_h, pixmap.width() - tick_w, bar_h,
+               Qt.AlignVCenter | Qt.AlignLeft, "İzlendi")
     p.end()
     return out
 
@@ -370,6 +375,10 @@ class MainWindow(QMainWindow):
         self.lib_kind.addItem("🖼 Photos", "photo")
         self.lib_kind.currentIndexChanged.connect(self._populate_library)
         top.addWidget(self.lib_kind)
+        self.btn_hide_watched = QPushButton("İzlenenleri Gizle")
+        self.btn_hide_watched.setCheckable(True)
+        self.btn_hide_watched.toggled.connect(lambda _: self._populate_library())
+        top.addWidget(self.btn_hide_watched)
         self.btn_scan = QPushButton("↻ Scan"); self.btn_scan.clicked.connect(self._start_scan)
         top.addWidget(self.btn_scan)
         v.addLayout(top)
@@ -427,8 +436,11 @@ class MainWindow(QMainWindow):
         self.lib_list.clear()
         src_names = {"local": "MyMedia", "emby": "Emby", "plex": "Plex"}
         hdr = src_names.get(source, "Library") if source else "Library"
-        self.lib_header.setText(f"{hdr} — {len(items)} items")
         watched = self.db.watched_keys([d.get("item_key") for d in items])
+        hide_watched = self.btn_hide_watched.isChecked()
+        if hide_watched:
+            items = [d for d in items if d.get("item_key") not in watched]
+        self.lib_header.setText(f"{hdr} — {len(items)} items")
         for d in items:
             label = d.get("title") or "?"
             if d.get("year"):
