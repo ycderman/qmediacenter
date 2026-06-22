@@ -837,11 +837,13 @@ class MainWindow(QMainWindow):
             return
         d = item.data(ROLE)
         if self.mode == "live":
-            self._play(self.client.live_url(d.get("stream_id")), d.get("name"))
+            self._play(self.client.live_url(d.get("stream_id")), d.get("name"),
+                       poster=d.get("stream_icon", ""))
             self.pages.setCurrentWidget(self.watch_page)
         elif self.mode == "vod":
             ext = d.get("container_extension") or "mp4"
-            self._play(self.client.movie_url(d.get("stream_id"), ext), d.get("name"))
+            self._play(self.client.movie_url(d.get("stream_id"), ext), d.get("name"),
+                       poster=d.get("stream_icon") or d.get("cover", ""))
             self.pages.setCurrentWidget(self.watch_page)
         elif self.mode == "series":
             if d == "__back__":
@@ -850,7 +852,9 @@ class MainWindow(QMainWindow):
                 self._open_series(d)
             else:
                 ext = d.get("container_extension") or "mp4"
-                self._play(self.client.series_url(d.get("id"), ext), d.get("title"))
+                cover = self.viewing_series.get("cover", "")
+                self._play(self.client.series_url(d.get("id"), ext), d.get("title"),
+                           poster=cover)
                 self.pages.setCurrentWidget(self.watch_page)
 
     def _show_categories(self):
@@ -923,7 +927,7 @@ class MainWindow(QMainWindow):
         self.player.play(url)
         self._show_controls()
         if self.mpris:
-            self.mpris.on_play(title)
+            self.mpris.on_play(title, self._current_poster)
 
     def _play_item(self, d):
         """Play a media/progress/favorite row dict from the home screen."""
@@ -1224,6 +1228,8 @@ class MainWindow(QMainWindow):
         self.player.set_volume(v)
         self.settings["volume"] = v
         config.save_settings(self.settings)
+        if self.mpris:
+            self.mpris.on_volume_change(v)
 
     def _stop_playback(self):
         self.player.stop()

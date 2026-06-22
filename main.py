@@ -71,7 +71,7 @@ def main():
         profile, client = login.profile, login.client
 
     win = MainWindow(profile, client)
-    win.mpris = MprisAdapter(win.player)
+    win.mpris = MprisAdapter(win.player, initial_volume=win.settings.get("volume", 100))
     win.show()
     return app.exec()
 
