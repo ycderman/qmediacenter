@@ -10,6 +10,11 @@ a = Analysis(
     noarchive=False,
 )
 
+# Drop bundled libstdc++/libgcc so the system version (which matches the
+# system's libavfilter/libmpv) is used instead of the older build-host one.
+a.binaries = [b for b in a.binaries
+              if not b[0].startswith(('libstdc++', 'libgcc_s', 'libgcc'))]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
