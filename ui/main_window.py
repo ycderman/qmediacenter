@@ -294,6 +294,7 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self._exit_fullscreen)
         QShortcut(QKeySequence(Qt.Key_F), self, activated=self._toggle_fullscreen)
+        QShortcut(QKeySequence(Qt.Key_Space), self, activated=self.player.toggle_pause)
 
     def _build_info_card(self):
         card = QFrame(); card.setObjectName("InfoCard")
