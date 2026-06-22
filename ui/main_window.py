@@ -838,6 +838,7 @@ class MainWindow(QMainWindow):
             return
         def apply(pm, it=item, w=watched):
             try:
+                pm = pm.scaled(POSTER, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 if w:
                     pm = _apply_watched_badge(pm)
                 it.setIcon(QIcon(pm))
