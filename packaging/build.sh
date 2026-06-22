@@ -42,6 +42,7 @@ fpm -s dir -t rpm \
   --license MIT \
   --depends "mpv-libs" \
   --depends "dbus-libs" \
+  --depends "libva" \
   --category "Applications/Multimedia" \
   --after-install packaging/postinst \
   --after-remove packaging/postrm \

@@ -191,6 +191,7 @@ jobs:
             --license MIT \
             --depends mpv-libs \
             --depends dbus-libs \
+            --depends libva \
             --category "Applications/Multimedia" \
             --after-install packaging/postinst \
             --after-remove  packaging/postrm \
@@ -249,7 +250,7 @@ jobs:
           name: rpm-package
           path: dist/
       - name: Install runtime deps
-        run: dnf install -y mpv-libs wayland-devel
+        run: dnf install -y mpv-libs wayland libva
       - name: Install .rpm
         run: dnf install -y dist/*.rpm
       - name: Verify binary installed
