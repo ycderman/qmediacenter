@@ -126,6 +126,12 @@ class MpvWidget(QOpenGLWidget):
             self.info_changed.emit(" · ".join(parts))
 
     # ---- public API ---------------------------------------------------
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        if delta != 0:
+            self.seek(10 if delta > 0 else -10, "relative")
+        event.accept()
+
     def play(self, url):
         self._mpv.play(url)
         self._mpv.pause = False
