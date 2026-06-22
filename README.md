@@ -2,6 +2,7 @@
 
 > A lightweight, open-source media center built with **Qt6 (PySide6)** and **libmpv** — bringing together IPTV, Emby, Plex, and your own local media library in one unified interface.
 
+![CI](https://github.com/ycderman/qmediacenter/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/github/license/ycderman/qmediacenter)
 ![Platform](https://img.shields.io/badge/platform-Linux-blue)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)

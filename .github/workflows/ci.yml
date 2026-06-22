@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ── Syntax check: every push ───────────────────────────────────────────────
+  syntax:
+    name: Python syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check all .py files parse cleanly
+        run: |
+          python - <<'EOF'
+          import ast, sys, pathlib
+          skip = {"dist", "__pycache__", "build"}
+          errors = []
+          files = [f for f in pathlib.Path(".").rglob("*.py")
+                   if not skip & set(f.parts)]
+          for f in files:
+              try:
+                  ast.parse(f.read_text())
+              except SyntaxError as e:
+                  errors.append(f"{f}:{e.lineno}: {e.msg}")
+          if errors:
+              print("\n".join(errors)); sys.exit(1)
+          print(f"OK — {len(files)} files")
+          EOF
+
+  # ── Headless UI tests: every push ─────────────────────────────────────────
+  test:
+    name: Headless UI tests
+    runs-on: ubuntu-latest
+    needs: syntax
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libmpv2 libgles2 libegl1 libxkbcommon0 libdbus-1-3 \
+            libfontconfig1 libfreetype6 libgl1
+      - name: Install Python dependencies
+        run: pip install --quiet pyside6 mpv pyopengl requests
+      - name: Run UI tests (offscreen)
+        env:
+          QT_QPA_PLATFORM: offscreen
+          LC_NUMERIC: C
+        run: python test_ui.py
+
+  # ── Package install smoke test: on release or manual trigger ──────────────
+  smoke-deb:
+    name: Install .deb — Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Download latest release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download --repo ${{ github.repository }} --pattern "*.deb"
+      - name: Install libmpv (dependency)
+        run: sudo apt-get update -q && sudo apt-get install -y libmpv2 || sudo apt-get install -y libmpv1
+      - name: Install .deb package
+        run: sudo dpkg -i qmediacenter_amd64.deb || (sudo apt-get install -f -y && sudo dpkg -i qmediacenter_amd64.deb)
+      - name: Verify binary exists
+        run: test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
+      - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
+        run: |
+          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter
+          EXIT=$?
+          echo "Exit code: $EXIT"
+          # 124 = killed by timeout (app was running — good)
+          # 0   = clean exit (good)
+          # 134 = SIGABRT, 139 = SIGSEGV (bad)
+          if [ "$EXIT" -eq 134 ] || [ "$EXIT" -eq 139 ]; then
+            echo "FAIL: process crashed (signal $EXIT)"; exit 1
+          fi
+          echo "PASS"
+
+  smoke-rpm:
+    name: Install .rpm — Fedora 41
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    container: fedora:41
+    steps:
+      - name: Install tools
+        run: dnf install -y curl libcurl jq
+      - name: Download latest release package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          URL=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+            | jq -r '.assets[] | select(.name | endswith(".rpm")) | .browser_download_url')
+          curl -fsSL -o package.rpm "$URL"
+      - name: Install .rpm package
+        run: |
+          dnf install -y mpv-libs
+          dnf install -y ./package.rpm
+      - name: Verify binary exists
+        run: test -x /opt/qmediacenter/qmediacenter && echo "Binary OK"
+      - name: Smoke test — must not crash (SIGABRT/SIGSEGV)
+        run: |
+          QT_QPA_PLATFORM=offscreen timeout 5 /opt/qmediacenter/qmediacenter
+          EXIT=$?
+          echo "Exit code: $EXIT"
+          if [ "$EXIT" -eq 134 ] || [ "$EXIT" -eq 139 ]; then
+            echo "FAIL: process crashed (signal $EXIT)"; exit 1
+          fi
+          echo "PASS"
