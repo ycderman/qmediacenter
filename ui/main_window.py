@@ -6,8 +6,9 @@ from PySide6.QtWidgets import (
     QProgressBar, QFrame, QScrollArea, QSizePolicy, QStackedWidget, QComboBox,
     QGraphicsDropShadowEffect,
 )
-from PySide6.QtCore import Qt, QThread, Signal, QSize, QTimer, QEvent
-from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QTimer, QEvent, QByteArray
+from PySide6.QtGui import QPixmap, QIcon, QShortcut, QKeySequence, QPainter
+from PySide6.QtSvg import QSvgRenderer
 
 from iptv import config
 from iptv.mpv_widget import MpvWidget
@@ -22,6 +23,16 @@ from media.imdb_ratings import ImdbRatings
 
 ROLE = Qt.UserRole
 POSTER = QSize(132, 198)
+
+_EMBY_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#52B54B"/>
+  <polygon points="30,25 30,75 75,50" fill="white"/>
+</svg>"""
+
+_PLEX_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="12" fill="#1F1F1F"/>
+  <polygon points="28,18 28,82 80,50" fill="#E5A00D"/>
+</svg>"""
 
 
 class Worker(QThread):
@@ -109,18 +120,17 @@ class MainWindow(QMainWindow):
         self.btn_mymedia = QPushButton("🗂 MyMedia"); self.btn_mymedia.setCheckable(True)
         self.btn_mymedia.clicked.connect(self._show_mymedia)
         nav.addWidget(self.btn_mymedia)
+        self.btn_emby = QPushButton(" Emby"); self.btn_emby.setCheckable(True)
+        self.btn_emby.setIcon(self._svg_icon(_EMBY_SVG))
+        self.btn_emby.clicked.connect(self._show_emby)
+        nav.addWidget(self.btn_emby)
+        self.btn_plex = QPushButton(" Plex"); self.btn_plex.setCheckable(True)
+        self.btn_plex.setIcon(self._svg_icon(_PLEX_SVG))
+        self.btn_plex.clicked.connect(self._show_plex)
+        nav.addWidget(self.btn_plex)
         self.btn_iptv = QPushButton("📺 IPTV"); self.btn_iptv.setCheckable(True)
         self.btn_iptv.clicked.connect(self._show_iptv)
         nav.addWidget(self.btn_iptv)
-        self.btn_emby = QPushButton("🟢 Emby"); self.btn_emby.setCheckable(True)
-        self.btn_emby.clicked.connect(self._show_emby)
-        nav.addWidget(self.btn_emby)
-        self.btn_plex = QPushButton("🟡 Plex"); self.btn_plex.setCheckable(True)
-        self.btn_plex.clicked.connect(self._show_plex)
-        nav.addWidget(self.btn_plex)
-        self.btn_downloads = QPushButton("⬇ Downloads"); self.btn_downloads.setCheckable(True)
-        self.btn_downloads.clicked.connect(self._show_downloads)
-        nav.addWidget(self.btn_downloads)
         nav.addStretch()
         self.btn_sources = QPushButton("⚙ Sources")
         self.btn_sources.clicked.connect(self._open_sources)
@@ -141,6 +151,9 @@ class MainWindow(QMainWindow):
             b.setCheckable(True)
             b.clicked.connect(lambda _=False, mm=m: self._set_mode(mm))
             iptv_sub.addWidget(b)
+        self.btn_downloads = QPushButton("⬇ Downloads"); self.btn_downloads.setCheckable(True)
+        self.btn_downloads.clicked.connect(self._show_downloads)
+        iptv_sub.addWidget(self.btn_downloads)
         iptv_sub.addStretch()
         self.iptv_subnav.setVisible(False)
         outer.addWidget(self.iptv_subnav)
@@ -332,7 +345,7 @@ class MainWindow(QMainWindow):
         for b in (self.btn_home, self.btn_mymedia, self.btn_iptv,
                   self.btn_emby, self.btn_plex, self.btn_downloads):
             b.setChecked(b is active_btn)
-        self.iptv_subnav.setVisible(active_btn is self.btn_iptv)
+        self.iptv_subnav.setVisible(active_btn in (self.btn_iptv, self.btn_downloads))
 
     def _show_mymedia(self):
         self._nav_select(self.btn_mymedia)
@@ -544,6 +557,16 @@ class MainWindow(QMainWindow):
         return box
 
     @staticmethod
+    def _svg_icon(svg_bytes: bytes, size: int = 20) -> QIcon:
+        renderer = QSvgRenderer(QByteArray(svg_bytes))
+        pm = QPixmap(size, size)
+        pm.fill(Qt.transparent)
+        painter = QPainter(pm)
+        renderer.render(painter)
+        painter.end()
+        return QIcon(pm)
+
+    @staticmethod
     def _track_pill(icon_text, combo):
         pill = QFrame(); pill.setObjectName("TrackPill")
         h = QHBoxLayout(pill)
@@ -618,8 +641,8 @@ class MainWindow(QMainWindow):
         self.cat_search.blockSignals(True)
         self.cat_search.clear()
         self.cat_search.setPlaceholderText(
-            {"vod": "Search movies…", "series": "Search series…"}.get(
-                mode, "Filter categories…"))
+            {"live": "Search channels…", "vod": "Search movies…",
+             "series": "Search series…"}.get(mode, "Search…"))
         self.cat_search.blockSignals(False)
         self.cat_list.clear(); self.content_list.clear()
         self.pages.setCurrentWidget(self.left)
@@ -639,13 +662,8 @@ class MainWindow(QMainWindow):
             self.cat_list.addItem(it)
         self.content_header.setText("Select a category")
 
-    # ---- name search (vod/series) -------------------------------------
+    # ---- name search (live/vod/series) -----------------------------------
     def _on_cat_search(self, text):
-        # Live: keep filtering the category list locally.
-        if self.mode == "live":
-            self._filter(self.cat_list, text)
-            return
-        # VOD/Series: search the whole catalog by movie/series title.
         text = text.strip()
         if not text:
             self.pages.setCurrentWidget(self.left)
@@ -657,15 +675,19 @@ class MainWindow(QMainWindow):
         self.content_list.clear()
         self.content_header.setText("Loading catalog…")
         self.pages.setCurrentWidget(self.center)
-        fetch = self.client.vod_streams if self.mode == "vod" else self.client.series
-        self._run(fetch, self._cache_and_search)
+        if self.mode == "live":
+            self._run(self.client.live_streams, self._cache_and_search)
+        elif self.mode == "vod":
+            self._run(self.client.vod_streams, self._cache_and_search)
+        else:
+            self._run(self.client.series, self._cache_and_search)
 
     def _cache_and_search(self, items):
         if isinstance(items, Exception) or not items:
             items = []
         self._all_streams[self.mode] = items
         q = self.cat_search.text().strip()
-        if q and self.mode != "live":
+        if q:
             self._apply_search(items, q)
 
     def _apply_search(self, items, text):
