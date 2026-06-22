@@ -215,3 +215,40 @@ class MprisAdapter:
     def on_volume_change(self, volume_0_150):
         if self._obj:
             self._obj.on_volume(volume_0_150)
+
+
+class ScreenInhibitor:
+    """Prevents screen blanking while video is playing via D-Bus ScreenSaver."""
+
+    _SS_BUS  = "org.freedesktop.ScreenSaver"
+    _SS_PATH = "/org/freedesktop/ScreenSaver"
+
+    def __init__(self):
+        self._cookie = None
+        self._proxy  = None
+        try:
+            bus = dbus.SessionBus()
+            self._proxy = bus.get_object(self._SS_BUS, self._SS_PATH)
+            log.info("ScreenSaver inhibitor ready")
+        except Exception as e:
+            log.warning("ScreenSaver inhibitor unavailable: %s", e)
+
+    def inhibit(self):
+        if self._proxy is None or self._cookie is not None:
+            return
+        try:
+            self._cookie = self._proxy.Inhibit(
+                "QMediaCenter", "Video playback",
+                dbus_interface=self._SS_BUS,
+            )
+        except Exception as e:
+            log.debug("Inhibit failed: %s", e)
+
+    def uninhibit(self):
+        if self._proxy is None or self._cookie is None:
+            return
+        try:
+            self._proxy.UnInhibit(self._cookie, dbus_interface=self._SS_BUS)
+        except Exception:
+            pass
+        self._cookie = None

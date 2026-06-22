@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self._fs = False
         self._lib_source = None
         self.mpris = None
+        self.inhibitor = None
 
         self.downloads = DownloadManager(
             self.settings.get("download_dir") or config.download_dir(), self)
@@ -877,6 +878,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self._base_title)
         if self.mpris:
             self.mpris.on_stop()
+        if self.inhibitor:
+            self.inhibitor.uninhibit()
         self._show_content()
 
     def _open_series(self, series):
@@ -929,6 +932,8 @@ class MainWindow(QMainWindow):
         self._show_controls()
         if self.mpris:
             self.mpris.on_play(title, self._current_poster)
+        if self.inhibitor:
+            self.inhibitor.inhibit()
 
     def _play_item(self, d):
         """Play a media/progress/favorite row dict from the home screen."""
@@ -1161,9 +1166,10 @@ class MainWindow(QMainWindow):
             self._resume_target = 0.0
 
     def _on_pause_changed(self, paused):
-        # Grey out the button matching the current state so it's obvious what's active.
         self.btn_play.setEnabled(paused)
         self.btn_pause.setEnabled(not paused)
+        if self.inhibitor:
+            self.inhibitor.uninhibit() if paused else self.inhibitor.inhibit()
 
     def _on_player_info(self, info):
         # show decoder + resolution in the title so HW decode is verifiable

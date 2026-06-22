@@ -13,7 +13,7 @@ from iptv import config
 from iptv.xtream import XtreamClient
 from ui.login_dialog import LoginDialog
 from ui.main_window import MainWindow
-from media.mpris import MprisAdapter
+from media.mpris import MprisAdapter, ScreenInhibitor
 
 
 def _rounded_icon(path, size=256):
@@ -72,6 +72,7 @@ def main():
 
     win = MainWindow(profile, client)
     win.mpris = MprisAdapter(win.player, initial_volume=win.settings.get("volume", 100))
+    win.inhibitor = ScreenInhibitor()
     win.show()
     return app.exec()
 
