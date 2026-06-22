@@ -114,6 +114,10 @@ class DownloadManager(QObject):
             lambda d, t, s, i=did, n=name: self.progress.emit(i, n, d, t, s))
         worker.finished_ok.connect(lambda p, i=did, n=name: self._done(i, n, p))
         worker.failed.connect(lambda e, i=did, n=name: self._fail(i, n, e))
+        # Remove from _workers only after Qt has finished thread cleanup.
+        # Removing on the application signal (failed/finished_ok) can GC the
+        # QThread while its internal cleanup is still running → SIGABRT.
+        worker.finished.connect(lambda i=did: self._workers.pop(i, None))
         self._workers[did] = worker
         worker.start()
         self.started.emit(did, name)
@@ -126,11 +130,9 @@ class DownloadManager(QObject):
 
     def _done(self, did, name, path):
         self.finished_ok.emit(did, name, path)
-        self._workers.pop(did, None)
 
     def _fail(self, did, name, err):
         self.failed.emit(did, name, err)
-        self._workers.pop(did, None)
 
     def cancel_all(self):
         """Stop active downloads (async); the .part is kept for later resume."""

@@ -1312,7 +1312,7 @@ class MainWindow(QMainWindow):
     def _run(self, fn, callback):
         w = Worker(fn, self)
         w.done.connect(callback)
-        w.done.connect(lambda _=None, ww=w: self._workers.remove(ww) if ww in self._workers else None)
+        w.finished.connect(lambda ww=w: self._workers.remove(ww) if ww in self._workers else None)
         self._workers.append(w)
         w.start()
 
