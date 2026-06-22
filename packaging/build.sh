@@ -22,6 +22,7 @@ fpm -s dir -t deb \
   --license MIT \
   --depends "libmpv1 | libmpv2" \
   --depends "libdbus-1-3" \
+  --depends "libwayland-server0" \
   --category "video" \
   --deb-no-default-config-files \
   --after-install packaging/postinst \

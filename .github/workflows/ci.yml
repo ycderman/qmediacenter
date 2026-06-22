@@ -145,6 +145,7 @@ jobs:
             --license MIT \
             --depends "libmpv1 | libmpv2" \
             --depends "libdbus-1-3" \
+            --depends "libwayland-server0" \
             --category video \
             --deb-no-default-config-files \
             --after-install packaging/postinst \
@@ -216,8 +217,8 @@ jobs:
         with:
           name: deb-package
           path: dist/
-      - name: Install libmpv
-        run: sudo apt-get update -q && sudo apt-get install -y libmpv2
+      - name: Install runtime deps
+        run: sudo apt-get update -q && sudo apt-get install -y libmpv2 libwayland-server0
       - name: Install .deb
         run: sudo dpkg -i dist/*.deb
       - name: Verify binary installed
@@ -229,8 +230,9 @@ jobs:
           QT_QPA_PLATFORM=offscreen LC_NUMERIC=C timeout 5 \
             /opt/qmediacenter/qmediacenter || EXIT=$?
           echo "Exit: ${EXIT:-0}"
-          if [ "${EXIT:-0}" -eq 134 ] || [ "${EXIT:-0}" -eq 139 ]; then
-            echo "FAIL: crashed (signal $((${EXIT:-0}-128)))"; exit 1
+          # timeout=124, clean exit=0 are OK; anything else is a real failure
+          if [ "${EXIT:-0}" -ne 0 ] && [ "${EXIT:-0}" -ne 124 ]; then
+            echo "FAIL: unexpected exit $EXIT"; exit 1
           fi
           echo "PASS"
 
@@ -246,8 +248,8 @@ jobs:
         with:
           name: rpm-package
           path: dist/
-      - name: Install mpv-libs
-        run: dnf install -y mpv-libs
+      - name: Install runtime deps
+        run: dnf install -y mpv-libs wayland-devel
       - name: Install .rpm
         run: dnf install -y dist/*.rpm
       - name: Verify binary installed
@@ -259,8 +261,8 @@ jobs:
           QT_QPA_PLATFORM=offscreen LC_NUMERIC=C timeout 5 \
             /opt/qmediacenter/qmediacenter || EXIT=$?
           echo "Exit: ${EXIT:-0}"
-          if [ "${EXIT:-0}" -eq 134 ] || [ "${EXIT:-0}" -eq 139 ]; then
-            echo "FAIL: crashed (signal $((${EXIT:-0}-128)))"; exit 1
+          if [ "${EXIT:-0}" -ne 0 ] && [ "${EXIT:-0}" -ne 124 ]; then
+            echo "FAIL: unexpected exit $EXIT"; exit 1
           fi
           echo "PASS"
 
