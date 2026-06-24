@@ -1,16 +1,19 @@
-"""ThemeManager — loads QSS themes and applies desktop accent colour."""
+"""ThemeManager — loads QSS themes and applies desktop accent colour.
+
+QSS files are read via importlib.resources so the wheel install path works
+correctly: the `themes` package ships *.qss as package-data and is looked up
+through the standard import machinery regardless of install location.
+"""
 from __future__ import annotations
 
+import importlib.resources
 import logging
-import os
 from pathlib import Path
 
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
 log = logging.getLogger(__name__)
-
-_THEMES_DIR = Path(__file__).parent.parent / "themes"
 
 THEMES: dict[str, dict] = {
     "breeze-light": {
@@ -37,6 +40,21 @@ _DEFAULT_THEME = "breeze-light"
 _ACCENT_PLACEHOLDER = "@ACCENT@"
 
 
+def _read_qss(filename: str) -> str | None:
+    """Read a QSS file from the `themes` package via importlib.resources.
+
+    Works both in editable installs (source tree) and real wheel/sdist installs
+    because setuptools ships themes/*.qss as package-data inside the `themes`
+    package.
+    """
+    try:
+        ref = importlib.resources.files("themes").joinpath(filename)
+        return ref.read_text(encoding="utf-8")
+    except Exception as exc:
+        log.error("ThemeManager: cannot read %s via importlib.resources: %s", filename, exc)
+        return None
+
+
 class ThemeManager:
     """Manages QSS theme loading and accent colour injection."""
 
@@ -61,14 +79,12 @@ class ThemeManager:
             theme_id = _DEFAULT_THEME
 
         meta = THEMES[theme_id]
-        qss_path = _THEMES_DIR / meta["file"]
-
-        if not qss_path.exists():
-            log.error("ThemeManager: QSS file missing: %s", qss_path)
+        raw = _read_qss(meta["file"])
+        if raw is None:
             return False
 
         resolved_accent = accent or self._detect_desktop_accent(meta["default_accent"])
-        qss = qss_path.read_text(encoding="utf-8").replace(_ACCENT_PLACEHOLDER, resolved_accent)
+        qss = raw.replace(_ACCENT_PLACEHOLDER, resolved_accent)
 
         app = QApplication.instance()
         if app is None:
@@ -106,14 +122,6 @@ class ThemeManager:
         except Exception:
             pass
         return default
-
-    @staticmethod
-    def load_qss_for_style_py(accent: str = "#3daee9") -> str:
-        """Compatibility shim so style.py callers still work during migration."""
-        path = _THEMES_DIR / "breeze-light.qss"
-        if path.exists():
-            return path.read_text(encoding="utf-8").replace(_ACCENT_PLACEHOLDER, accent)
-        return ""
 
 
 # Module-level singleton

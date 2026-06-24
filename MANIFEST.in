@@ -1,0 +1,23 @@
+# Files to include in the source distribution (sdist) beyond what setuptools
+# automatically picks up from packages and py-modules.
+
+# App icon, AppStream metainfo
+recursive-include data *.png *.xml *.svg
+
+# QSS theme files (also covered by package-data for the wheel)
+recursive-include themes *.qss
+
+# Desktop entry and Flatpak manifest
+include packaging/qmediacenter.desktop
+include packaging/io.github.ycderman.qmediacenter.yaml
+include packaging/qmediacenter.sh
+
+# Documentation
+include README.md LICENSE CHANGELOG.md
+recursive-include docs *.md *.png
+
+# Exclude build artefacts
+prune dist
+prune build
+prune __pycache__
+global-exclude *.pyc *.pyo *.pyd

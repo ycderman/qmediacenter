@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "setuptools-scm"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "qmediacenter"
@@ -53,10 +53,15 @@ qmediacenter = "main:main"
 qmediacenter = "main:main"
 
 [tool.setuptools]
-packages = ["iptv", "media", "ui"]
+packages = ["iptv", "media", "ui", "themes"]
 py-modules = ["main"]
 
 [tool.setuptools.package-data]
+# QSS theme files must ship inside the wheel so importlib.resources can find them
+"themes" = ["*.qss"]
+# Icon shipped inside the `data` directory is accessed via filesystem path in main.py.
+# Include it in the sdist via MANIFEST.in; wheel install via data_files below is preferred
+# for system-wide placement (handled by deb/rpm/flatpak packaging instead).
 "*" = ["py.typed"]
 
 [tool.setuptools_scm]

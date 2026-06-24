@@ -22,17 +22,16 @@ class TestThemeManager:
             assert "default_accent" in theme
 
     def test_qss_files_exist(self):
-        from pathlib import Path
-        themes_dir = Path(__file__).parent.parent / "themes"
+        import importlib.resources
         for theme in THEMES.values():
-            p = themes_dir / theme["file"]
-            assert p.exists(), f"Missing QSS file: {p}"
+            ref = importlib.resources.files("themes").joinpath(theme["file"])
+            assert ref.is_file(), f"Missing QSS file in themes package: {theme['file']}"
 
     def test_qss_contains_accent_placeholder(self):
-        from pathlib import Path
-        themes_dir = Path(__file__).parent.parent / "themes"
+        import importlib.resources
         for theme in THEMES.values():
-            content = (themes_dir / theme["file"]).read_text()
+            ref = importlib.resources.files("themes").joinpath(theme["file"])
+            content = ref.read_text(encoding="utf-8")
             assert "@ACCENT@" in content, f"{theme['file']} missing @ACCENT@ placeholder"
 
     def test_apply_unknown_theme_falls_back(self):
