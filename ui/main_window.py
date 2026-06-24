@@ -123,6 +123,10 @@ class MainWindow(QMainWindow):
         self._recent_offset = 0
         self._workers = []
         self._fs = False
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setInterval(self._STREAM_CACHE_TTL * 1000)
+        self._refresh_timer.timeout.connect(self._bg_refresh_all)
+        self._refresh_timer.setSingleShot(False)
         self._lib_source = None
         self.mpris = None
         self.inhibitor = None
@@ -769,9 +773,6 @@ class MainWindow(QMainWindow):
             it.setData(ROLE, c.get("category_id"))
             self.cat_list.addItem(it)
         self.content_header.setText("Select a category")
-        if self.mode in ("vod", "series"):
-            if not self.db.cache_exists(f"xtream_{self.mode}_streams", max_age=self._STREAM_CACHE_TTL):
-                self._prefetch_streams(self.mode)
 
     _STREAM_CACHE_TTL = 2 * 3600  # 2 hours
 
@@ -783,15 +784,6 @@ class MainWindow(QMainWindow):
             except (ValueError, TypeError):
                 return 0
         return sorted(items, key=_ts, reverse=True)[:1000]
-
-    def _prefetch_streams(self, mode):
-        fetch = self.client.vod_streams if mode == "vod" else self.client.series
-        def _store(items, m=mode):
-            if not isinstance(items, Exception) and items:
-                self.db.cache_put(f"xtream_{m}_recent", self._sort_recent(items))
-                self.db.cache_put(f"xtream_{m}_streams", items)
-                del items
-        self._run(fetch, _store)
 
     # ---- name search (live/vod/series) -----------------------------------
     def _on_cat_search(self, text):
@@ -1561,7 +1553,33 @@ class MainWindow(QMainWindow):
         self._workers.append(w)
         w.start()
 
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        if self.client is not None:
+            QTimer.singleShot(500, self._bg_refresh_all)
+            self._refresh_timer.start()
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        QTimer.singleShot(0, self.content_list.doItemsLayout)
+
+    def _bg_refresh_all(self):
+        for mode in ("vod", "series"):
+            self._bg_refresh_mode(mode)
+
+    def _bg_refresh_mode(self, mode):
+        fetch = self.client.vod_streams if mode == "vod" else self.client.series
+        def _store(items, m=mode):
+            if not isinstance(items, Exception) and items:
+                recent = self._sort_recent(items)
+                self.db.cache_put(f"xtream_{m}_recent", recent)
+                self.db.cache_put(f"xtream_{m}_streams", items)
+                del items
+                print(f"[BG] {m} refreshed — {len(recent)} recent items", flush=True)
+        self._run(fetch, _store)
+
     def closeEvent(self, ev):
+        self._refresh_timer.stop()
         self.downloads.shutdown()   # join download threads (avoids QThread abort)
         for w in list(self._workers):
             w.wait(3000)
