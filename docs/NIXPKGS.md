@@ -68,6 +68,7 @@ present, so skipping this check is safe.
 Before submitting to nixpkgs:
 - Pin `src` to a tagged release with a real `sha256` (replace `lib.fakeSha256`)
 - Set `version` to the release tag (e.g. `"0.7.0"`)
-- Remove `maintainers.ycderman or {}` placeholder
+- Add yourself to `maintainers/maintainer-list.nix` in the nixpkgs repo, then
+  add to the derivation: `maintainers = with maintainers; [ ycderman ];`
 - Run `nix-build` and confirm the `result/` symlink works end-to-end
 - Open a PR against `nixpkgs/master` in the `pkgs/applications/video/` tree

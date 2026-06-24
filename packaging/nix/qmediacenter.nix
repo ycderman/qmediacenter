@@ -83,6 +83,8 @@ python3.pkgs.buildPythonApplication {
     license     = licenses.mit;
     platforms   = platforms.linux;
     mainProgram = "qmediacenter";
-    maintainers = with maintainers; [ (ycderman or lib.systems.inspect.ycderman or lib.id {}) ];
+    # maintainers field is intentionally omitted in this development derivation.
+    # When submitting to nixpkgs, add yourself to maintainers/maintainer-list.nix
+    # and add: maintainers = with maintainers; [ ycderman ];
   };
 }
