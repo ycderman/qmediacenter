@@ -9,3 +9,5 @@ qmediacenter_version.py
 .ruff_cache/
 *.whl
 *.tar.gz
+.flatpak-builder/
+result

@@ -178,16 +178,19 @@ test_ui.py              1 154-line monolithic unittest file
 - [x] Wheel contents verified: themes, icon, metainfo all present
 - [x] CI wheel-build + clean-venv install smoke test
 
-### 0.7.0 — Packaging & Distribution (Sprint 3)
+### 0.7.0 — Packaging & Distribution (Sprint 3 — in progress)
 - [x] `pyproject.toml` complete
 - [x] `pip install .` / `pipx install .` works
 - [x] Split tests into `tests/`
 - [x] `pytest` + CI job
-- [ ] RPM spec for OBS/Fedora
-- [ ] Debian `debian/` structure
-- [ ] AUR `PKGBUILD`
-- [ ] Nixpkgs `buildPythonApplication` derivation
-- [ ] Flathub PR reopened with checklist + video
+- [x] `packaging/nix/qmediacenter.nix` — `buildPythonApplication` derivation, builds + smoke-tested
+- [x] `packaging/flatpak/io.github.ycderman.qmediacenter.yml` — pip install manifest, builds + smoke-tested
+- [x] `docs/NIXPKGS.md` + `docs/FLATPAK.md`
+- [ ] Nixpkgs submission (pinned release sha256, PR against nixpkgs/master)
+- [ ] Flathub PR reopened with checklist + video (manual)
+- [ ] RPM `.spec` for OBS/Fedora (Sprint 4)
+- [ ] Debian `debian/` structure (Sprint 5)
+- [ ] AUR `PKGBUILD` (Sprint 4)
 - [ ] `CONTRIBUTING.md`
 - [ ] AppStream `releases` updated for 0.6.x tags
 
@@ -223,8 +226,8 @@ test_ui.py              1 154-line monolithic unittest file
 - Update `releases` in metainfo to include 0.6.x tags
 
 ### Nixpkgs
-- `package.nix` must become `buildPythonApplication` targeting a released sdist or GitHub tag
-- `pyproject.toml` is a prerequisite
+- ✅ `packaging/nix/qmediacenter.nix` is a working `buildPythonApplication` derivation
+- Remaining: pin to a release tag with real `sha256`, open nixpkgs PR
 
 ### openSUSE OBS / Fedora
 - Real RPM `.spec` file needed (not PyInstaller + fpm)
@@ -259,16 +262,40 @@ test_ui.py              1 154-line monolithic unittest file
 - CI `wheel-build` job: build → verify wheel contents → clean venv install → smoke
 - Wheel verified: all resources present, install+run confirmed
 
-### Sprint 3 — Proposed
-Priority: distro packaging files so the project can be submitted to real repos.
+### Sprint 3 — Completed 2026-06-24
+Nix + Flatpak packaging infrastructure.
 
-1. `packaging/nix/qmediacenter.nix` — `buildPythonApplication` derivation
-2. `packaging/rpm/qmediacenter.spec` — proper RPM spec for OBS/Fedora
-3. `packaging/arch/PKGBUILD` — AUR package
-4. `packaging/debian/` — `control`, `rules`, `copyright`, `watch`
-5. AppStream `releases` updated for all 0.6.x tags
-6. `CONTRIBUTING.md`
-7. Flathub PR re-opened with proper checklist + demo video (manual)
-8. `data_files` or post-install hooks for `.desktop` + metainfo system paths
+1. ✅ `packaging/nix/qmediacenter.nix` — `buildPythonApplication` derivation
+   - `wrapQtAppsHook` for Qt plugin path; `LD_LIBRARY_PATH` for libmpv
+   - `dontCheckRuntimeDeps` (PyPA normalisation mismatch for `mpv` binding)
+   - `packaging/nix/default.nix` — source filter removes `dist/` artifacts
+   - Builds and smoke-tested: `--version`, `--help`, desktop/icon/metainfo installed
+2. ✅ `packaging/flatpak/io.github.ycderman.qmediacenter.yml`
+   - Uses `io.qt.PySide.BaseApp//6.8` + `org.kde.Platform//6.8`
+   - Builds mpv from source (libass → libplacebo → mpv chain)
+   - pip installs qmediacenter via pyproject.toml (importlib.resources works)
+   - `type: dir` for local dev; `type: git` for Flathub
+   - Builds and smoke-tested via `flatpak-builder --run`
+3. ✅ `docs/NIXPKGS.md`, `docs/FLATPAK.md`, packaging READMEs
+4. ✅ README updated with Nix + Flatpak install sections
+
+### Sprint 4 — Proposed
+RPM, AUR and Nixpkgs submission.
+
+1. `packaging/rpm/qmediacenter.spec` — real RPM spec (pyproject-based)
+2. `packaging/arch/PKGBUILD` — AUR package pointing at release tag
+3. Nixpkgs PR: pin `qmediacenter.nix` to release sha256, submit to nixpkgs/master
+4. COPR/OBS initial setup
+5. Flathub PR re-opened with proper checklist + demo video (manual — AI policy)
+6. AppStream `releases` updated for all 0.6.x tags
+7. `CONTRIBUTING.md`
+
+### Sprint 5 — Proposed
+Debian packaging.
+
+1. `packaging/debian/` — `control`, `rules`, `copyright`, `changelog`, `watch`
+2. All runtime deps must exist as Debian packages (check `python-mpv` status)
+3. ITP filed on Debian BTS
+4. pbuilder/sbuild clean network-free build test
 
 *This document is updated at the end of each sprint.*

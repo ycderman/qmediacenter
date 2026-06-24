@@ -52,15 +52,32 @@ wget https://github.com/ycderman/qmediacenter/releases/latest/download/qmediacen
 sudo dnf install ./qmediacenter_x86_64.rpm
 ```
 
-### NixOS
+### NixOS (development packaging)
 
 ```bash
-# Use the derivation at package.nix in this repo
-nix-build package.nix
-./result/bin/qplayer
+git clone https://github.com/ycderman/qmediacenter
+cd qmediacenter
+nix-build packaging/nix/default.nix
+./result/bin/qmediacenter --version
 ```
 
-> A proper `buildPythonApplication` derivation for Nixpkgs is planned for 0.7.0.
+This is a development derivation (`buildPythonApplication`). A Nixpkgs submission
+with a pinned release hash is planned for Sprint 4. See `docs/NIXPKGS.md`.
+
+### Flatpak (development packaging)
+
+```bash
+git clone https://github.com/ycderman/qmediacenter
+cd qmediacenter
+flatpak-builder --force-clean /tmp/qmc-build \
+  packaging/flatpak/io.github.ycderman.qmediacenter.yml
+flatpak-builder --install --user /tmp/qmc-build \
+  packaging/flatpak/io.github.ycderman.qmediacenter.yml
+flatpak run io.github.ycderman.qmediacenter
+```
+
+This builds from the local repo using `io.qt.PySide.BaseApp//6.8` + `org.kde.Platform//6.8`.
+A Flathub PR submission is planned for Sprint 4. See `docs/FLATPAK.md`.
 
 ### From source
 
