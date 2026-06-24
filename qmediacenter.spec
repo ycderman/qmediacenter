@@ -3,7 +3,12 @@
 a = Analysis(
     ['main.py'],
     datas=[('data', 'data')],
-    hiddenimports=['media.plex', 'media.emby', 'dbus', 'dbus.mainloop.glib', 'gi', 'gi.repository.GLib'],
+    hiddenimports=[
+        'media.plex', 'media.emby',
+        'dbus', 'dbus.mainloop.glib', 'gi', 'gi.repository.GLib',
+        'OpenGL.platform.egl', 'OpenGL.platform.glx', 'OpenGL.arrays.numpymodule',
+        'charset_normalizer', 'charset_normalizer.md__mypyc',
+    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

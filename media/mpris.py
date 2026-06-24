@@ -14,6 +14,19 @@ except Exception:
     _AVAILABLE = False
     log.warning("dbus-python/pygobject not available; MPRIS2 disabled")
 
+    def _noop(*a, **kw):
+        return (lambda f: f) if callable(a[0] if a else None) else (lambda f: f)
+
+    class _DbusStub:
+        def __getattr__(self, _):
+            return self
+        def __call__(self, *a, **kw):
+            return self
+        Boolean = Double = String = Int64 = ObjectPath = Array = Dictionary = staticmethod(lambda *a, **kw: None)
+        Object = object
+
+    dbus = _DbusStub()
+
 MPRIS_IFACE  = "org.mpris.MediaPlayer2"
 PLAYER_IFACE = "org.mpris.MediaPlayer2.Player"
 PROPS_IFACE  = "org.freedesktop.DBus.Properties"
@@ -21,7 +34,7 @@ BUS_NAME     = "org.mpris.MediaPlayer2.qmediacenter"
 OBJECT_PATH  = "/org/mpris/MediaPlayer2"
 
 
-class _MprisObject(dbus.service.Object):
+class _MprisObject(dbus.service.Object if _AVAILABLE else object):
     def __init__(self, bus, player_widget, initial_volume=100):
         dbus.service.Object.__init__(self, bus, OBJECT_PATH)
         self._player  = player_widget
