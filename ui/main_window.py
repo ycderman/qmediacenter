@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
 
         self.accent = desktop_accent()
         self.setStyleSheet(build_qss(self.accent))
-        self.setWindowTitle(f"QMediaCenter — {profile['name']}")
+        self.setWindowTitle(f"QMediaCenter — {profile['name']}" if profile else "QMediaCenter")
         self.resize(1320, 820)
         self._build_ui()
         self._show_home()
@@ -199,7 +199,7 @@ class MainWindow(QMainWindow):
         self.iptv_subnav = QWidget()
         iptv_sub = QHBoxLayout(self.iptv_subnav)
         iptv_sub.setContentsMargins(20, 2, 4, 2)
-        iptv_name_lbl = QLabel(f"● {self.profile['name']}")
+        iptv_name_lbl = QLabel(f"● {self.profile['name']}" if self.profile else "● IPTV")
         iptv_name_lbl.setObjectName("Meta")
         iptv_sub.addWidget(iptv_name_lbl)
         self.btn_live = QPushButton("📡 Live")
@@ -292,7 +292,7 @@ class MainWindow(QMainWindow):
         self._controls_timer.setSingleShot(True)
         self._controls_timer.setInterval(2500)
         self._controls_timer.timeout.connect(self._hide_controls)
-        self._base_title = f"QMediaCenter — {self.profile['name']}"
+        self._base_title = f"QMediaCenter — {self.profile['name']}" if self.profile else "QMediaCenter"
         self.right.addWidget(player_box)
         self.right.setSizes([300, 500])
         watch_layout.addWidget(self.right, 1)

@@ -43,6 +43,10 @@ class LoginDialog(QDialog):
         root.addWidget(self.status)
 
         btns = QHBoxLayout()
+        skip_btn = QPushButton("Skip (no IPTV)")
+        skip_btn.clicked.connect(self.reject)
+        skip_btn.setToolTip("Open without IPTV — use Emby, Plex or local library only")
+        btns.addWidget(skip_btn)
         btns.addStretch()
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.setDefault(True)

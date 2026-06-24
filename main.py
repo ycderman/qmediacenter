@@ -66,9 +66,10 @@ def main():
     profile, client = _auto_profile()
     if profile is None:
         login = LoginDialog()
-        if login.exec() != LoginDialog.Accepted:
-            return 0
-        profile, client = login.profile, login.client
+        result = login.exec()
+        if result == LoginDialog.Accepted:
+            profile, client = login.profile, login.client
+        # Rejected (Skip) → open without IPTV; profile/client stay None
 
     win = MainWindow(profile, client)
     win.mpris = MprisAdapter(win.player, initial_volume=win.settings.get("volume", 100))
