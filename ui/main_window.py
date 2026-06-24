@@ -119,6 +119,8 @@ class MainWindow(QMainWindow):
         self.category_id = None
         self.viewing_series = None
         self._all_streams = {}          # mode -> full catalog (cached for name search)
+        self._recent_items = []         # sorted list for scroll pagination
+        self._recent_offset = 0
         self._workers = []
         self._fs = False
         self._lib_source = None
@@ -247,6 +249,7 @@ class MainWindow(QMainWindow):
         self.content_list.setUniformItemSizes(True)
         self.content_list.currentItemChanged.connect(self._on_content_selected)
         self.content_list.itemActivated.connect(self._on_content_activated)
+        self.content_list.verticalScrollBar().valueChanged.connect(self._on_content_scroll)
         cv.addWidget(self.content_list)
         self.pages.addWidget(self.center)
 
@@ -813,6 +816,9 @@ class MainWindow(QMainWindow):
         self.content_header.setText("Loading…")
         self.pages.setCurrentWidget(self.center)
         cid = self.category_id
+        if cid != "__recent__":
+            self._recent_items = []
+            self._recent_offset = 0
         if cid == "__recent__":
             self._load_recently_added()
             return
@@ -843,8 +849,39 @@ class MainWindow(QMainWindow):
                 return int(v)
             except (ValueError, TypeError):
                 return 0
-        recent = sorted(items, key=_added_ts, reverse=True)[:300]
-        self._populate_content_sorted(recent)
+        self._recent_items = sorted(items, key=_added_ts, reverse=True)[:1000]
+        self._recent_offset = 0
+        self.content_list.clear()
+        self.content_header.setText(f"{len(self._recent_items)} items")
+        self._append_recent_batch()
+
+    _RECENT_PAGE = 250
+
+    def _append_recent_batch(self):
+        items = self._recent_items
+        offset = self._recent_offset
+        if offset >= len(items):
+            return
+        batch = items[offset:offset + self._RECENT_PAGE]
+        self.content_list.setUpdatesEnabled(False)
+        for d in batch:
+            name = d.get("name") or d.get("title") or "?"
+            it = QListWidgetItem(name)
+            it.setData(ROLE, d)
+            it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
+            it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
+            url = d.get("stream_icon") or d.get("cover")
+            self._load_poster(it, url)
+            self.content_list.addItem(it)
+        self.content_list.setUpdatesEnabled(True)
+        self._recent_offset += len(batch)
+
+    def _on_content_scroll(self, value):
+        if not self._recent_items or self._recent_offset >= len(self._recent_items):
+            return
+        sb = self.content_list.verticalScrollBar()
+        if value >= sb.maximum() - sb.pageStep() // 2:
+            self._append_recent_batch()
 
     def _populate_content_sorted(self, items):
         self.content_list.clear()
