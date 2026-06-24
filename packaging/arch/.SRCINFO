@@ -1,0 +1,25 @@
+pkgbase = qmediacenter
+	pkgdesc = Qt6/libmpv media center — IPTV, Emby, Plex and local media
+	pkgver = 0.7.0
+	pkgrel = 1
+	url = https://github.com/ycderman/qmediacenter
+	arch = x86_64
+	license = MIT
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-setuptools
+	makedepends = python-setuptools-scm
+	makedepends = python-wheel
+	depends = python
+	depends = pyside6
+	depends = python-mpv
+	depends = python-pyopengl
+	depends = python-requests
+	depends = yt-dlp
+	depends = mpv
+	depends = qt6-wayland
+	optdepends = python-dbus: MPRIS2 media player integration
+	source = qmediacenter-0.7.0.tar.gz::https://github.com/ycderman/qmediacenter/archive/refs/tags/v0.7.0.tar.gz
+	sha256sums = 6723ddf69e2554b26dd63e312e69b9c0440f5bbafbb7e03a2c860377054d8f1d
+
+pkgname = qmediacenter

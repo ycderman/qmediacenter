@@ -2,27 +2,65 @@
 
 ## Status: v0.7.0 ready
 
-`PKGBUILD` contains the real sha256sum for v0.7.0. The next step is to
-generate `.SRCINFO` on an Arch system and push to AUR.
+`PKGBUILD` and `.SRCINFO` are pinned to v0.7.0. All hashes verified.
+The next step is to push to AUR from an Arch system.
 
-## Generate .SRCINFO and push to AUR (requires Arch Linux or Arch container)
+## Dependency status (Arch official repos)
+
+All runtime dependencies are in the official `extra` repository — no AUR
+dependencies required:
+
+| Package | Repo |
+|---------|------|
+| `python` | core |
+| `pyside6` | extra |
+| `python-mpv` | extra |
+| `python-pyopengl` | extra |
+| `python-requests` | extra |
+| `yt-dlp` | extra |
+| `mpv` | extra |
+| `qt6-wayland` | extra |
+
+## Push to AUR (requires Arch system or Arch container)
+
+```bash
+# Clone the AUR repo (first time only)
+git clone ssh://aur@aur.archlinux.org/qmediacenter.git aur-qmediacenter
+
+# Copy the files
+cp packaging/arch/PKGBUILD packaging/arch/.SRCINFO aur-qmediacenter/
+
+# Commit and push
+cd aur-qmediacenter
+git add PKGBUILD .SRCINFO
+git commit -m "Initial release 0.7.0"
+git push
+```
+
+## Build locally (on Arch or in Arch container)
 
 ```bash
 cd packaging/arch
 
-# Generate .SRCINFO (needed for AUR submission)
-makepkg --printsrcinfo > .SRCINFO
+# Install build dependencies
+sudo pacman -S --needed base-devel python-build python-installer \
+  python-setuptools python-setuptools-scm python-wheel
 
-# Optional: test local build (downloads source, builds wheel, installs)
+# Build and install
 makepkg --cleanbuild --syncdeps --noconfirm
 sudo pacman -U qmediacenter-0.7.0-1-x86_64.pkg.tar.zst
-
-# Push to AUR
-git clone ssh://aur@aur.archlinux.org/qmediacenter.git aur-qmediacenter
-cp PKGBUILD .SRCINFO aur-qmediacenter/
-cd aur-qmediacenter && git add -A && git commit -m "Initial release 0.7.0"
-git push
 ```
+
+## Regenerate .SRCINFO
+
+```bash
+cd packaging/arch
+makepkg --printsrcinfo > .SRCINFO
+```
+
+`.SRCINFO` was generated using `makepkg --printsrcinfo` (via nix-shell pacman
+on NixOS with `MAKEPKG_CONF` override). The output is deterministic and
+functionally identical to what `makepkg` produces on Arch.
 
 ## v0.7.0 source hash
 
@@ -43,14 +81,4 @@ Source: `https://github.com/ycderman/qmediacenter/archive/refs/tags/v0.7.0.tar.g
    ```
 3. Update `sha256sums=('...')`.
 4. Re-run `makepkg --printsrcinfo > .SRCINFO`.
-5. Commit and push to AUR.
-
-## Notes
-
-- `makepkg` is not available on NixOS — use an Arch container:
-  ```bash
-  docker run --rm -it archlinux:latest bash
-  pacman -Sy --noconfirm base-devel git && cd /tmp
-  # copy PKGBUILD in, then run makepkg
-  ```
-- `python-mpv` must be present in AUR before this package can be installed.
+5. Commit to main, then push to AUR.
