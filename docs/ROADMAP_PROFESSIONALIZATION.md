@@ -1,6 +1,6 @@
 # QMediaCenter — Professionalization Roadmap
 
-> Generated: 2026-06-24 | Updated: 2026-06-25 | Status: Sprint 3.5 complete
+> Generated: 2026-06-24 | Updated: 2026-06-25 | Status: Sprint 4 complete
 
 ---
 
@@ -140,12 +140,12 @@ test_ui.py              1 154-line monolithic unittest file
 
 | Distro | Status | Blocker |
 |--------|--------|---------|
-| Flatpak/Flathub | Local build works | PR needs checklist + video; manifest to maintain |
-| Nixpkgs | `package.nix` exists but outdated | Needs rewrite as buildPythonApplication |
-| openSUSE OBS | Not started | Needs real RPM spec |
-| Fedora COPR/official | Not started | Needs real RPM spec + review |
-| Debian mentors | Not started | Needs `debian/` directory + ITP |
-| AUR | Not started | Needs PKGBUILD |
+| Flatpak/Flathub | ✅ Flathub manifest ready (`type: git`) | Push tag → fill commit hash → PR checklist + demo video |
+| Nixpkgs | ✅ `buildPythonApplication` derivation + release-example.nix | Push tag → run nix-prefetch-url → open nixpkgs PR |
+| openSUSE OBS | ✅ RPM spec ready | Push tag → test on Fedora/OBS → submit |
+| Fedora COPR/official | ✅ RPM spec ready | Same as OBS |
+| Debian mentors | Not started | Needs `debian/` directory + ITP (Sprint 5) |
+| AUR | ✅ PKGBUILD ready | Push tag → fill sha256sum → push to AUR |
 | Arch official | Not started | AUR first |
 
 ---
@@ -178,21 +178,27 @@ test_ui.py              1 154-line monolithic unittest file
 - [x] Wheel contents verified: themes, icon, metainfo all present
 - [x] CI wheel-build + clean-venv install smoke test
 
-### 0.7.0 — Packaging & Distribution (Sprint 3 — in progress)
+### 0.7.0 — Packaging & Distribution (Sprint 4 — complete)
 - [x] `pyproject.toml` complete
 - [x] `pip install .` / `pipx install .` works
 - [x] Split tests into `tests/`
-- [x] `pytest` + CI job
+- [x] `pytest` + CI job (63 passed, 2 skipped)
 - [x] `packaging/nix/qmediacenter.nix` — `buildPythonApplication` derivation, builds + smoke-tested
-- [x] `packaging/flatpak/io.github.ycderman.qmediacenter.yml` — pip install manifest, builds + smoke-tested
-- [x] `docs/NIXPKGS.md` + `docs/FLATPAK.md`
-- [ ] Nixpkgs submission (pinned release sha256, PR against nixpkgs/master)
-- [ ] Flathub PR reopened with checklist + video (manual)
-- [ ] RPM `.spec` for OBS/Fedora (Sprint 4)
+- [x] `packaging/nix/release-example.nix` — release pin template for Nixpkgs PR
+- [x] `packaging/flatpak/io.github.ycderman.qmediacenter.yml` — local dev manifest (type: dir)
+- [x] `packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml` — Flathub manifest (type: git, v0.7.0)
+- [x] `packaging/rpm/qmediacenter.spec` — real pyproject-based RPM spec (Fedora/openSUSE)
+- [x] `packaging/arch/PKGBUILD` + `packaging/arch/README.md` — AUR package
+- [x] `docs/NIXPKGS.md` + `docs/FLATPAK.md` updated
+- [x] `CONTRIBUTING.md` complete
+- [x] AppStream `releases` updated (0.5.0 through 0.7.0, validates cleanly)
+- [x] CHANGELOG [0.7.0] as proper release notes
+- [x] `docs/RELEASE.md` full release process documented
+- [ ] v0.7.0 git tag + GitHub Release (tag pending push, manual)
+- [ ] Nixpkgs PR — pin real sha256, open PR against nixpkgs/master (manual, after tag)
+- [ ] Flathub PR — type: git, commit hash, checklist + demo video (manual, after tag)
+- [ ] AUR sha256sum update + push to aur.archlinux.org (manual, after tag)
 - [ ] Debian `debian/` structure (Sprint 5)
-- [ ] AUR `PKGBUILD` (Sprint 4)
-- [ ] `CONTRIBUTING.md`
-- [ ] AppStream `releases` updated for 0.6.x tags
 
 ### 0.8.0 — Architecture
 - [ ] `MainWindow` split into page controllers
@@ -222,25 +228,26 @@ test_ui.py              1 154-line monolithic unittest file
 ## Blocking Issues per Target
 
 ### Flatpak/Flathub
-- Reopen PR with proper checklist and demo video (manual — Flathub AI policy)
-- Update `releases` in metainfo to include 0.6.x tags
+- ✅ `packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml` — `type: git`, v0.7.0
+- Remaining: push v0.7.0 tag → fill `commit:` hash → reopen PR with checklist + demo video
 
 ### Nixpkgs
-- ✅ `packaging/nix/qmediacenter.nix` is a working `buildPythonApplication` derivation
-- Remaining: pin to a release tag with real `sha256`, open nixpkgs PR
+- ✅ `packaging/nix/qmediacenter.nix` — working `buildPythonApplication` derivation
+- ✅ `packaging/nix/release-example.nix` — release pin template
+- Remaining: push v0.7.0 tag → `nix-prefetch-url` to get real hash → open nixpkgs PR
 
 ### openSUSE OBS / Fedora
-- Real RPM `.spec` file needed (not PyInstaller + fpm)
-- `pyproject.toml` prerequisite
+- ✅ `packaging/rpm/qmediacenter.spec` — real pyproject-based RPM spec
+- Remaining: push tag → test on Fedora container or COPR → submit
 
 ### Debian mentors
-- `debian/` directory with all required files
-- Network-free build (no pip during `%build`)
+- `debian/` directory with all required files (Sprint 5)
+- Network-free build (no pip during `dh_auto_build`)
 - All deps must exist as Debian packages (python-mpv status in Debian is unclear)
 
 ### AUR
-- Simplest target: `PKGBUILD` pointing at GitHub release tag
-- `pyproject.toml` makes this clean
+- ✅ `packaging/arch/PKGBUILD` ready
+- Remaining: push tag → replace `sha256sums=('SKIP')` → push to AUR
 
 ---
 
@@ -294,15 +301,30 @@ Release readiness and quality pass.
 9. ✅ README NixOS section corrected (removed `nix-build package.nix` / `qplayer`)
 10. ✅ ROADMAP Sprint 4/5/6 milestones defined
 
-### Sprint 4 — Proposed
-RPM spec, AUR PKGBUILD, and release tag.
+### Sprint 4 — Completed 2026-06-25
+RPM spec, AUR PKGBUILD, Flathub manifest, and release prep.
 
-1. Cut the first official `v0.7.0` release tag + GitHub Release
-2. `packaging/rpm/qmediacenter.spec` — proper RPM spec (pyproject-based)
-3. `packaging/arch/PKGBUILD` — AUR package pointing at release tag
-4. Nixpkgs derivation: pin to release sha256, add to `nixpkgs/master` PR
-5. Flathub PR re-opened: `type: git` source, proper checklist, demo video (manual)
-6. COPR or OBS initial setup
+1. ✅ `packaging/rpm/qmediacenter.spec` — real pyproject-based RPM spec (Fedora/openSUSE)
+   - `%pyproject_wheel` / `%pyproject_install` macros
+   - `SETUPTOOLS_SCM_PRETEND_VERSION` for tarball builds (no .git)
+   - `%check` validates desktop file, AppStream, headless `--version` smoke
+   - openSUSE package name notes in comments
+2. ✅ `packaging/arch/PKGBUILD` — AUR package for v0.7.0
+   - `python -m build --wheel --no-isolation` + `python -m installer`
+   - `sha256sums=('SKIP')` placeholder — replace before AUR push
+3. ✅ `packaging/arch/README.md` — AUR submission workflow
+4. ✅ `packaging/nix/release-example.nix` — release pin template with `lib.fakeHash`
+5. ✅ `packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml` — Flathub `type: git` manifest
+   - SETUPTOOLS_SCM_PRETEND_VERSION=0.7.0
+   - Same module chain as dev manifest; commit placeholder to replace after tagging
+6. ✅ `docs/FLATPAK.md` — local vs Flathub manifest distinction, release workflow
+7. ✅ `docs/NIXPKGS.md` — nix-prefetch-url command for hash pinning
+8. ✅ Distro repo table updated
+
+**Post-sprint manual steps (require live v0.7.0 tag on GitHub):**
+- `git tag -a v0.7.0 -m "QMediaCenter 0.7.0" && git push origin v0.7.0`
+- Update `sha256sums` in PKGBUILD; update `commit:` in flathub manifest
+- Open Nixpkgs PR, open Flathub PR, push to AUR
 
 ### Sprint 5 — Proposed
 Debian packaging.

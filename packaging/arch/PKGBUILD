@@ -1,0 +1,63 @@
+# Maintainer: ycderman <y.canderman@proton.me>
+
+pkgname=qmediacenter
+pkgver=0.7.0
+pkgrel=1
+pkgdesc="Qt6/libmpv media center — IPTV, Emby, Plex and local media"
+# x86_64 only: libmpv and Mesa are arch-specific at runtime.
+# The Python sources are pure but Qt/mpv platform plugins are not.
+arch=('x86_64')
+url="https://github.com/ycderman/qmediacenter"
+license=('MIT')
+
+depends=(
+    'python'
+    'pyside6'
+    'python-mpv'
+    'python-pyopengl'
+    'python-requests'
+    'yt-dlp'
+    'mpv'          # provides libmpv.so for the python-mpv ctypes binding
+    'qt6-wayland'
+)
+
+makedepends=(
+    'python-build'
+    'python-installer'
+    'python-setuptools'
+    'python-setuptools-scm'
+    'python-wheel'
+)
+
+optdepends=(
+    'python-dbus: MPRIS2 media player integration'
+)
+
+source=("$pkgname-$pkgver.tar.gz::https://github.com/ycderman/$pkgname/archive/refs/tags/v$pkgver.tar.gz")
+# Update sha256sum after tagging v0.7.0:
+#   curl -L <source_url> | sha256sum
+# or: makepkg -g
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    # setuptools-scm needs a version hint because the extracted tarball has no .git
+    SETUPTOOLS_SCM_PRETEND_VERSION="$pkgver" \
+        python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    SETUPTOOLS_SCM_PRETEND_VERSION="$pkgver" \
+        python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # Desktop integration
+    install -Dm644 packaging/qmediacenter.desktop \
+        "$pkgdir/usr/share/applications/io.github.ycderman.qmediacenter.desktop"
+    install -Dm644 data/io.github.ycderman.qmediacenter.metainfo.xml \
+        "$pkgdir/usr/share/metainfo/io.github.ycderman.qmediacenter.metainfo.xml"
+    install -Dm644 data/qmediacenter.png \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/io.github.ycderman.qmediacenter.png"
+    install -Dm644 LICENSE \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

@@ -63,12 +63,38 @@ ships with pname `"mpv"` but the PyPA normalisation of the wheel metadata doesn'
 producing a false "not installed" error. The Nix closure already guarantees the dep is
 present, so skipping this check is safe.
 
+## Pinning to a release tag
+
+See `packaging/nix/release-example.nix` for a ready-to-use template.
+
+Get the hash after tagging:
+
+```bash
+nix-prefetch-url --unpack \
+  https://github.com/ycderman/qmediacenter/archive/refs/tags/v0.7.0.tar.gz
+```
+
+Or with the newer `nix` CLI:
+
+```bash
+nix flake prefetch github:ycderman/qmediacenter/v0.7.0
+# The hash appears as narHash in the output
+```
+
+Build from the pinned derivation:
+
+```bash
+nix-build packaging/nix/release-example.nix
+# First run will fail with the correct hash — copy it, update release-example.nix, rebuild
+./result/bin/qmediacenter --version
+```
+
 ## Nixpkgs submission (Sprint 4)
 
 Before submitting to nixpkgs:
-- Pin `src` to a tagged release with a real `sha256` (replace `lib.fakeSha256`)
+- Pin `src` to a tagged release with a real `sha256` (replace `lib.fakeHash`)
 - Set `version` to the release tag (e.g. `"0.7.0"`)
 - Add yourself to `maintainers/maintainer-list.nix` in the nixpkgs repo, then
   add to the derivation: `maintainers = with maintainers; [ ycderman ];`
-- Run `nix-build` and confirm the `result/` symlink works end-to-end
+- Run `nix-build` against the nixpkgs checkout and confirm end-to-end
 - Open a PR against `nixpkgs/master` in the `pkgs/applications/video/` tree
