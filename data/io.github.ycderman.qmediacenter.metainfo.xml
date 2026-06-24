@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ycderman.qmediacenter</id>
+  <name>QMediaCenter</name>
+  <summary>IPTV, Emby, Plex and local media in one Qt6 interface</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      QMediaCenter is a lightweight, open-source media center built with Qt6 (PySide6)
+      and libmpv. It brings together IPTV (Xtream Codes), Emby, Plex, and your local
+      media library in one unified interface.
+    </p>
+    <ul>
+      <li>IPTV (Xtream Codes) — Live TV, Movies and Series with category browsing and full-catalog search</li>
+      <li>Emby and Plex — browse and play server libraries with auto user detection</li>
+      <li>Local and network library — scan folders for video, music and photos enriched with posters</li>
+      <li>Hardware decoding — VAAPI on Linux (Intel, AMD); HEVC, AV1, H.264, AC-3, DTS</li>
+      <li>Continue Watching — resume positions saved across all sources</li>
+      <li>Home screen — rows for Continue Watching, Favourites, Recently Added</li>
+      <li>Wayland and X11 support</li>
+      <li>KDE Breeze Light theme with desktop accent colour</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.ycderman.qmediacenter.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Home screen with source-tagged rows</caption>
+      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/home.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>IPTV — Live TV, Movies and Series</caption>
+      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/iptv.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Detail view with metadata</caption>
+      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/detail.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Local media library</caption>
+      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/mymedia.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/ycderman/qmediacenter</url>
+  <url type="bugtracker">https://github.com/ycderman/qmediacenter/issues</url>
+  <url type="vcs-browser">https://github.com/ycderman/qmediacenter</url>
+
+  <developer id="io.github.ycderman">
+    <name>ycderman</name>
+  </developer>
+
+  <provides>
+    <binary>qmediacenter</binary>
+  </provides>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>Player</category>
+    <category>TV</category>
+  </categories>
+
+  <keywords>
+    <keyword>iptv</keyword>
+    <keyword>media</keyword>
+    <keyword>player</keyword>
+    <keyword>mpv</keyword>
+    <keyword>emby</keyword>
+    <keyword>plex</keyword>
+    <keyword>xtream</keyword>
+    <keyword>tv</keyword>
+    <keyword>movies</keyword>
+    <keyword>series</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.5.2" date="2026-06-24">
+      <description>
+        <p>Disk-cached IPTV stream list, scroll pagination for recently added, background auto-refresh.</p>
+      </description>
+    </release>
+  </releases>
+</component>

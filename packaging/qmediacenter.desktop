@@ -1,9 +1,9 @@
 [Desktop Entry]
 Name=QMediaCenter
 Comment=Qt6/mpv media center — IPTV, Emby, Plex + local/network library
-Exec=/opt/qmediacenter/qmediacenter
-Icon=qmediacenter
+Exec=qmediacenter
+Icon=io.github.ycderman.qmediacenter
 Terminal=false
 Type=Application
-Categories=AudioVideo;Video;Player;
+Categories=AudioVideo;Video;Player;TV;
 StartupWMClass=QMediaCenter
