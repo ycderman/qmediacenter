@@ -1,8 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os as _os
+_repo_root = _os.path.abspath(_os.path.join(SPECPATH, '../..'))
 
 a = Analysis(
-    ['main.py'],
-    datas=[('data', 'data')],
+    [_os.path.join(_repo_root, 'main.py')],
+    datas=[(_os.path.join(_repo_root, 'data'), 'data')],
     hiddenimports=[
         'media.plex', 'media.emby',
         'dbus', 'dbus.mainloop.glib', 'gi', 'gi.repository.GLib',
