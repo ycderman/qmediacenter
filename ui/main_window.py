@@ -843,7 +843,7 @@ class MainWindow(QMainWindow):
                 return int(v)
             except (ValueError, TypeError):
                 return 0
-        recent = sorted(items, key=_added_ts, reverse=True)
+        recent = sorted(items, key=_added_ts, reverse=True)[:300]
         self._populate_content_sorted(recent)
 
     def _populate_content_sorted(self, items):
