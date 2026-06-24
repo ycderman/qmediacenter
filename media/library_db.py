@@ -228,6 +228,16 @@ class LibraryDB:
         return len(gone)
 
     # ---- metadata cache ----------------------------------------------
+    def cache_exists(self, key, max_age=None):
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT fetched_at FROM meta_cache WHERE key=?", (key,)).fetchone()
+        if not row:
+            return False
+        if max_age and time.time() - row["fetched_at"] > max_age:
+            return False
+        return True
+
     def cache_get(self, key, max_age=None):
         with self._lock:
             row = self._conn.execute(

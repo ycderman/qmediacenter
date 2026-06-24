@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         self.mode = "live"
         self.category_id = None
         self.viewing_series = None
-        self._all_streams = {}          # mode -> full catalog (cached for name search)
+        self._search_buf = {}           # mode -> full catalog for search (current mode only)
         self._recent_items = []         # sorted list for scroll pagination
         self._recent_offset = 0
         self._workers = []
@@ -731,6 +731,7 @@ class MainWindow(QMainWindow):
     def _set_mode(self, mode):
         self.mode = mode
         self.viewing_series = None
+        self._search_buf.clear()
         self._nav_select(self.btn_iptv)
         for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
             b.setChecked(m == mode)
@@ -768,20 +769,16 @@ class MainWindow(QMainWindow):
             it.setData(ROLE, c.get("category_id"))
             self.cat_list.addItem(it)
         self.content_header.setText("Select a category")
-        if self.mode in ("vod", "series") and self.mode not in self._all_streams:
-            self._prefetch_streams(self.mode)
+        if self.mode in ("vod", "series"):
+            if not self.db.cache_exists(f"xtream_{self.mode}_streams", max_age=self._STREAM_CACHE_TTL):
+                self._prefetch_streams(self.mode)
 
     _STREAM_CACHE_TTL = 2 * 3600  # 2 hours
 
     def _prefetch_streams(self, mode):
-        disk = self.db.cache_get(f"xtream_{mode}_streams", max_age=self._STREAM_CACHE_TTL)
-        if disk:
-            self._all_streams[mode] = disk
-            return
         fetch = self.client.vod_streams if mode == "vod" else self.client.series
         def _store(items, m=mode):
             if not isinstance(items, Exception) and items:
-                self._all_streams[m] = items
                 self.db.cache_put(f"xtream_{m}_streams", items)
         self._run(fetch, _store)
 
@@ -791,9 +788,14 @@ class MainWindow(QMainWindow):
         if not text:
             self.pages.setCurrentWidget(self.left)
             return
-        cached = self._all_streams.get(self.mode)
-        if cached is not None:
-            self._apply_search(cached, text)
+        buf = self._search_buf.get(self.mode)
+        if buf is not None:
+            self._apply_search(buf, text)
+            return
+        disk = self.db.cache_get(f"xtream_{self.mode}_streams", max_age=self._STREAM_CACHE_TTL)
+        if disk:
+            self._search_buf = {self.mode: disk}
+            self._apply_search(disk, text)
             return
         self.content_list.clear()
         self.content_header.setText("Loading catalog…")
@@ -808,7 +810,8 @@ class MainWindow(QMainWindow):
     def _cache_and_search(self, items):
         if isinstance(items, Exception) or not items:
             items = []
-        self._all_streams[self.mode] = items
+        self._search_buf = {self.mode: items}
+        self.db.cache_put(f"xtream_{self.mode}_streams", items)
         q = self.cat_search.text().strip()
         if q:
             self._apply_search(items, q)
@@ -844,19 +847,13 @@ class MainWindow(QMainWindow):
         self._run(fn, self._populate_content)
 
     def _load_recently_added(self):
-        cached = self._all_streams.get(self.mode)
-        if cached is not None:
-            self._show_recently_added(cached)
-            return
         disk = self.db.cache_get(f"xtream_{self.mode}_streams", max_age=self._STREAM_CACHE_TTL)
         if disk:
-            self._all_streams[self.mode] = disk
             self._show_recently_added(disk)
             return
         fetch = (self.client.vod_streams if self.mode == "vod" else self.client.series)
         def _fetched(items):
             if not isinstance(items, Exception) and items:
-                self._all_streams[self.mode] = items
                 self.db.cache_put(f"xtream_{self.mode}_streams", items)
             self._show_recently_added(items)
         self._run(fetch, _fetched)
