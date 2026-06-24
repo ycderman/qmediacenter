@@ -638,7 +638,6 @@ class MainWindow(QMainWindow):
         _src_badge = {"emby": " [Emby]", "plex": " [Plex]", "xtream": " [IPTV]"}
         for d in items:
             label = d.get("title") or "?"
-            extra = d.get("extra") or {}
             src = d.get("source", "")
             if src and src != "local":
                 label += _src_badge.get(src, f" [{src.title()}]")
@@ -859,7 +858,7 @@ class MainWindow(QMainWindow):
             print(f"[RECENT] disk cache hit — {len(recent)} items — {(_time.monotonic()-_t0)*1000:.0f}ms", flush=True)
             self._show_recently_added(recent)
             return
-        print(f"[RECENT] no cache, fetching from API…", flush=True)
+        print("[RECENT] no cache, fetching from API…", flush=True)
         fetch = (self.client.vod_streams if self.mode == "vod" else self.client.series)
         def _fetched(items, _t=_t0):
             elapsed = (_time.monotonic() - _t) * 1000

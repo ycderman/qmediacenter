@@ -643,13 +643,511 @@ class TestMainWindow(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# 5. Local media scanner
+# ---------------------------------------------------------------------------
+
+from media.local_scanner import parse_filename, iter_media_files, LibraryScanner
+
+
+class TestLocalScanner(unittest.TestCase):
+
+    # --- parse_filename ---
+
+    def test_movie_year_and_quality(self):
+        r = parse_filename("Inception.2010.1080p.BluRay.x264.mkv")
+        self.assertEqual(r["kind"], "movie")
+        self.assertEqual(r["title"], "Inception")
+        self.assertEqual(r["year"], 2010)
+
+    def test_movie_web_dl(self):
+        r = parse_filename("The.Matrix.1999.WEB-DL.1080p.mkv")
+        self.assertEqual(r["kind"], "movie")
+        self.assertEqual(r["title"], "The Matrix")
+        self.assertEqual(r["year"], 1999)
+
+    def test_episode_sxxeyy(self):
+        r = parse_filename("Breaking.Bad.S03E07.720p.mkv")
+        self.assertEqual(r["kind"], "episode")
+        self.assertEqual(r["title"], "Breaking Bad")
+        self.assertEqual(r["season"], 3)
+        self.assertEqual(r["episode"], 7)
+
+    def test_episode_NxMM_format(self):
+        r = parse_filename("Dizi.1x02.HDTV.avi")
+        self.assertEqual(r["kind"], "episode")
+        self.assertEqual(r["season"], 1)
+        self.assertEqual(r["episode"], 2)
+
+    def test_episode_with_year_in_show_title(self):
+        r = parse_filename("Show.2019.S01E01.mkv")
+        self.assertEqual(r["kind"], "episode")
+        self.assertEqual(r["season"], 1)
+        self.assertEqual(r["episode"], 1)
+
+    def test_movie_no_year(self):
+        r = parse_filename("Oldfilm.BluRay.mkv")
+        self.assertEqual(r["kind"], "movie")
+        self.assertIsNone(r["year"])
+        self.assertTrue(len(r["title"]) > 0)
+
+    def test_weird_filename_no_crash(self):
+        r = parse_filename("---___.mp4")
+        self.assertIn("kind", r)
+        self.assertIn("title", r)
+
+    def test_empty_stem_no_crash(self):
+        r = parse_filename(".mp4")
+        self.assertIn("kind", r)
+
+    def test_year_at_start_of_name(self):
+        r = parse_filename("2001.A.Space.Odyssey.1968.BluRay.mkv")
+        self.assertEqual(r["kind"], "movie")
+        self.assertIsNotNone(r.get("year"))
+
+    def test_spaces_in_filename(self):
+        r = parse_filename("The Dark Knight (2008) [1080p].mkv")
+        self.assertEqual(r["kind"], "movie")
+        self.assertEqual(r["year"], 2008)
+
+    # --- iter_media_files ---
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def _make(self, relpath):
+        full = os.path.join(self.tmpdir, relpath)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        open(full, "w").close()
+        return full
+
+    def test_iter_finds_video(self):
+        self._make("movies/film.mkv")
+        found = list(iter_media_files([self.tmpdir]))
+        paths = [p for p, k in found]
+        self.assertTrue(any("film.mkv" in p for p in paths))
+
+    def test_iter_classifies_music(self):
+        self._make("music/song.mp3")
+        found = dict(iter_media_files([self.tmpdir]))
+        self.assertIn("music", found.values())
+
+    def test_iter_classifies_photo(self):
+        self._make("photos/pic.jpg")
+        found = dict(iter_media_files([self.tmpdir]))
+        self.assertIn("photo", found.values())
+
+    def test_iter_ignores_non_media(self):
+        self._make("stuff/readme.txt")
+        self._make("stuff/data.json")
+        found = list(iter_media_files([self.tmpdir]))
+        self.assertEqual(found, [])
+
+    def test_iter_nonexistent_path(self):
+        found = list(iter_media_files(["/nonexistent/path/xyz"]))
+        self.assertEqual(found, [])
+
+    def test_iter_nested_dirs(self):
+        self._make("a/b/c/deep.mp4")
+        found = list(iter_media_files([self.tmpdir]))
+        self.assertEqual(len(found), 1)
+
+    # --- LibraryScanner.scan ---
+
+    def test_scan_inserts_movie(self):
+        self._make("movies/Interstellar.2014.1080p.mkv")
+        db = _open_db(self.tmpdir)
+        scanner = LibraryScanner(db)
+        added, total = scanner.scan([self.tmpdir])
+        items = db.media(source="local")
+        self.assertTrue(any(d.get("title") == "Interstellar" for d in items))
+        db.close()
+
+    def test_scan_inserts_episode(self):
+        self._make("tv/Show.S02E05.mkv")
+        db = _open_db(self.tmpdir)
+        scanner = LibraryScanner(db)
+        scanner.scan([self.tmpdir])
+        items = db.media(source="local", kind="episode")
+        self.assertTrue(any(d.get("extra", {}).get("season") == 2 for d in items))
+        db.close()
+
+    def test_scan_progress_callback(self):
+        self._make("movies/Film.2000.mkv")
+        db = _open_db(self.tmpdir)
+        scanner = LibraryScanner(db)
+        calls = []
+        scanner.scan([self.tmpdir], progress=lambda done, total, title: calls.append(done))
+        self.assertGreater(len(calls), 0)
+        db.close()
+
+    def test_scan_stop_signal(self):
+        for i in range(10):
+            self._make(f"movies/Film{i}.2000.mkv")
+        db = _open_db(self.tmpdir)
+        scanner = LibraryScanner(db)
+        stop = [False]
+        def should_stop():
+            stop[0] = True
+            return True
+        scanner.scan([self.tmpdir], should_stop=should_stop)
+        items = db.media(source="local")
+        self.assertLessEqual(len(items), 1)
+        db.close()
+
+    def test_scan_delete_missing(self):
+        p = self._make("movies/Old.2000.mkv")
+        db = _open_db(self.tmpdir)
+        scanner = LibraryScanner(db)
+        scanner.scan([self.tmpdir])
+        os.remove(p)
+        scanner.scan([self.tmpdir])
+        items = db.media(source="local")
+        self.assertEqual(len(items), 0)
+        db.close()
+
+    def test_scan_idempotent(self):
+        self._make("movies/Film.2000.mkv")
+        db = _open_db(self.tmpdir)
+        scanner = LibraryScanner(db)
+        scanner.scan([self.tmpdir])
+        scanner.scan([self.tmpdir])
+        items = db.media(source="local")
+        self.assertEqual(len(items), 1)
+        db.close()
+
+
+def _open_db(tmpdir):
+    from media.library_db import LibraryDB
+    return LibraryDB(os.path.join(tmpdir, f"test_{id(tmpdir)}.db"))
+
+
+# ---------------------------------------------------------------------------
+# 6. Metadata provider
+# ---------------------------------------------------------------------------
+
+from media.metadata import MetadataProvider
+
+
+class TestMetadataProvider(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        from media.library_db import LibraryDB
+        self.db = LibraryDB(os.path.join(self.tmpdir, "meta.db"))
+
+    def tearDown(self):
+        self.db.close()
+
+    def _provider(self, tmdb="", omdb=""):
+        return MetadataProvider(self.db, tmdb_key=tmdb, omdb_key=omdb)
+
+    def _tmdb_response(self, results=None, detail=None):
+        search_resp = MagicMock()
+        search_resp.raise_for_status = lambda: None
+        search_resp.json.return_value = {"results": results or [{
+            "id": 1234, "title": "Test Movie", "overview": "A test.",
+            "poster_path": "/poster.jpg", "backdrop_path": "/back.jpg",
+            "vote_average": 7.5
+        }]}
+        detail_resp = MagicMock()
+        detail_resp.ok = True
+        detail_resp.json.return_value = detail or {
+            "genres": [{"name": "Action"}],
+            "imdb_id": "tt1234567",
+            "external_ids": {"imdb_id": "tt1234567"}
+        }
+        return search_resp, detail_resp
+
+    def test_no_keys_disabled(self):
+        p = self._provider()
+        self.assertFalse(p.enabled)
+
+    def test_no_keys_lookup_returns_empty(self):
+        p = self._provider()
+        result = p.lookup("Anything", 2020, "movie")
+        self.assertEqual(result, {})
+
+    def test_tmdb_lookup_returns_poster(self):
+        p = self._provider(tmdb="fake_key")
+        search_r, detail_r = self._tmdb_response()
+        with patch("requests.get", side_effect=[search_r, detail_r]):
+            result = p.lookup("Test Movie", 2020, "movie")
+        self.assertIn("poster", result)
+        self.assertTrue(result["poster"].endswith("poster.jpg"))
+
+    def test_tmdb_lookup_returns_imdb_id(self):
+        p = self._provider(tmdb="fake_key")
+        search_r, detail_r = self._tmdb_response()
+        with patch("requests.get", side_effect=[search_r, detail_r]):
+            result = p.lookup("Test Movie", 2020, "movie")
+        self.assertEqual(result.get("imdb_id"), "tt1234567")
+
+    def test_tmdb_lookup_returns_genres(self):
+        p = self._provider(tmdb="fake_key")
+        search_r, detail_r = self._tmdb_response()
+        with patch("requests.get", side_effect=[search_r, detail_r]):
+            result = p.lookup("Test Movie", 2020, "movie")
+        self.assertIn("Action", result.get("genres", []))
+
+    def test_tmdb_no_results_returns_empty(self):
+        p = self._provider(tmdb="fake_key")
+        r = MagicMock()
+        r.raise_for_status = lambda: None
+        r.json.return_value = {"results": []}
+        with patch("requests.get", return_value=r):
+            result = p.lookup("Unknown Film XYZ", None, "movie")
+        self.assertEqual(result, {})
+
+    def test_tmdb_server_error_returns_empty(self):
+        p = self._provider(tmdb="fake_key")
+        import requests as req
+        with patch("requests.get", side_effect=req.exceptions.ConnectionError("down")):
+            result = p.lookup("Film", 2020, "movie")
+        self.assertEqual(result, {})
+
+    def test_tmdb_timeout_returns_empty(self):
+        p = self._provider(tmdb="fake_key")
+        import requests as req
+        with patch("requests.get", side_effect=req.exceptions.Timeout()):
+            result = p.lookup("Film", 2020, "movie")
+        self.assertEqual(result, {})
+
+    def test_omdb_rating_parsed(self):
+        p = self._provider(tmdb="fake_key", omdb="fake_omdb")
+        search_r, detail_r = self._tmdb_response()
+        omdb_r = MagicMock()
+        omdb_r.raise_for_status = lambda: None
+        omdb_r.json.return_value = {"imdbRating": "8.1"}
+        with patch("requests.get", side_effect=[search_r, detail_r, omdb_r]):
+            result = p.lookup("Test Movie", 2020, "movie")
+        self.assertAlmostEqual(result.get("rating"), 8.1, places=1)
+
+    def test_omdb_na_rating_returns_none_not_crash(self):
+        p = self._provider(omdb="fake_omdb")
+        omdb_r = MagicMock()
+        omdb_r.raise_for_status = lambda: None
+        omdb_r.json.return_value = {"imdbRating": "N/A"}
+        with patch("requests.get", return_value=omdb_r):
+            result = p._omdb_rating(None, "Unknown", None)
+        self.assertIsNone(result)
+
+    def test_lookup_cached_no_second_request(self):
+        p = self._provider(tmdb="fake_key")
+        search_r, detail_r = self._tmdb_response()
+        call_count = []
+        def counting_json():
+            call_count.append(1)
+            return {"results": [{"id": 1, "title": "X", "poster_path": None,
+                                  "backdrop_path": None, "vote_average": 0, "overview": ""}]}
+        search_r.json = counting_json
+        detail_r2 = MagicMock(); detail_r2.ok = True
+        detail_r2.json.return_value = {"genres": [], "imdb_id": None, "external_ids": {}}
+        with patch("requests.get", side_effect=[search_r, detail_r2]):
+            p.lookup("Test Movie", 2020, "movie")
+        with patch("requests.get", side_effect=Exception("should not call")):
+            p.lookup("Test Movie", 2020, "movie")
+
+    def test_tv_lookup_uses_tv_endpoint(self):
+        p = self._provider(tmdb="fake_key")
+        search_r = MagicMock()
+        search_r.raise_for_status = lambda: None
+        search_r.json.return_value = {"results": []}
+        urls = []
+        import requests as req
+        def capture_get(url, **kwargs):
+            urls.append(url)
+            return search_r
+        with patch("requests.get", side_effect=capture_get):
+            p.lookup("Some Show", 2019, "tv")
+        self.assertTrue(any("/tv" in u for u in urls))
+
+
+# ---------------------------------------------------------------------------
+# 7. Player widget (headless-safe)
+# ---------------------------------------------------------------------------
+
+
+class TestPlayerWidget(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication(sys.argv)
+        from iptv.mpv_widget import MpvWidget
+        cls.player = MpvWidget()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.player.shutdown()
+
+    def test_volume_normal(self):
+        self.player.set_volume(80)
+        self.assertEqual(self.player._mpv.volume, 80)
+
+    def test_volume_clamp_zero(self):
+        self.player.set_volume(-10)
+        self.assertEqual(self.player._mpv.volume, 0)
+
+    def test_volume_clamp_max(self):
+        self.player.set_volume(200)
+        self.assertEqual(self.player._mpv.volume, 150)
+
+    def test_stop_when_idle_no_crash(self):
+        self.player.stop()
+
+    def test_seek_when_idle_no_crash(self):
+        self.player.seek(30, "absolute")
+
+    def test_seek_relative_no_crash(self):
+        self.player.seek(10, "relative")
+
+    def test_pause_toggle_no_crash(self):
+        self.player.toggle_pause()
+        self.player.toggle_pause()
+
+    def test_set_pause_no_crash(self):
+        self.player.set_pause(True)
+        self.player.set_pause(False)
+
+    def test_set_audio_no_crash(self):
+        self.player.set_audio(1)
+
+    def test_set_subtitle_no_crash(self):
+        self.player.set_subtitle(0)
+
+    def test_play_bad_url_no_crash(self):
+        self.player.play("http://127.0.0.1:1/nonexistent.ts")
+        time.sleep(0.1)
+        self.player.stop()
+
+    def test_signals_exist(self):
+        from PySide6.QtCore import Signal
+        self.assertTrue(hasattr(self.player, "duration_changed"))
+        self.assertTrue(hasattr(self.player, "position_changed"))
+        self.assertTrue(hasattr(self.player, "pause_changed"))
+        self.assertTrue(hasattr(self.player, "tracks_changed"))
+        self.assertTrue(hasattr(self.player, "info_changed"))
+
+
+# ---------------------------------------------------------------------------
+# 8. Xtream error scenarios
+# ---------------------------------------------------------------------------
+
+import requests as _req
+
+
+class _ErrorXtreamHandler(BaseHTTPRequestHandler):
+    """Mock server that returns errors based on username."""
+    def log_message(self, *_): pass
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        user = params.get("username", ["u"])[0]
+
+        if user == "badauth":
+            body = {"user_info": {"auth": 0}, "server_info": {}}
+            self._respond(200, body)
+        elif user == "servererr":
+            self.send_response(500)
+            self.end_headers()
+        elif user == "badjson":
+            data = b"not json at all {"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        elif user == "emptycat":
+            self._respond(200, [])
+        elif user == "missingfields":
+            self._respond(200, [{"extra": "field"}])
+        else:
+            self._respond(200, {"user_info": {"auth": 1}, "server_info": {}})
+
+    def _respond(self, code, obj):
+        data = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+class TestXtreamErrors(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server = HTTPServer(("127.0.0.1", 0), _ErrorXtreamHandler)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+
+    def _client(self, user):
+        from iptv.xtream import XtreamClient
+        return XtreamClient(f"http://127.0.0.1:{self.port}", user, "p", timeout=3)
+
+    def test_bad_credentials_authenticate_returns_none(self):
+        c = self._client("badauth")
+        self.assertIsNone(c.authenticate())
+
+    def test_server_500_returns_empty_list(self):
+        c = self._client("servererr")
+        result = c.live_categories()
+        self.assertEqual(result, [])
+
+    def test_bad_json_returns_empty_list(self):
+        c = self._client("badjson")
+        result = c.vod_categories()
+        self.assertEqual(result, [])
+
+    def test_connection_refused_returns_empty_list(self):
+        from iptv.xtream import XtreamClient
+        c = XtreamClient("http://127.0.0.1:1", "u", "p", timeout=1)
+        result = c.live_streams()
+        self.assertEqual(result, [])
+
+    def test_timeout_returns_empty_list(self):
+        from iptv.xtream import XtreamClient
+        import socket
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        port = srv.getsockname()[1]
+        c = XtreamClient(f"http://127.0.0.1:{port}", "u", "p", timeout=0.1)
+        result = c.vod_streams()
+        srv.close()
+        self.assertEqual(result, [])
+
+    def test_empty_category_returns_empty_list(self):
+        c = self._client("emptycat")
+        result = c.series_categories()
+        self.assertEqual(result, [])
+
+    def test_missing_fields_returned_as_is(self):
+        c = self._client("missingfields")
+        result = c.live_streams()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertNotIn("stream_id", result[0])
+
+    def test_authenticate_bad_then_good(self):
+        bad = self._client("badauth")
+        self.assertIsNone(bad.authenticate())
+        good = self._client("u")
+        self.assertIsNotNone(good.authenticate())
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
-    for cls in (TestLibraryDB, TestImageLoader, TestXtreamClient, TestMainWindow):
+    for cls in (TestLibraryDB, TestImageLoader, TestXtreamClient, TestMainWindow,
+                TestLocalScanner, TestMetadataProvider, TestPlayerWidget, TestXtreamErrors):
         suite.addTests(loader.loadTestsFromTestCase(cls))
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
