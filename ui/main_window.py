@@ -768,6 +768,15 @@ class MainWindow(QMainWindow):
             it.setData(ROLE, c.get("category_id"))
             self.cat_list.addItem(it)
         self.content_header.setText("Select a category")
+        if self.mode in ("vod", "series") and self.mode not in self._all_streams:
+            self._prefetch_streams(self.mode)
+
+    def _prefetch_streams(self, mode):
+        fetch = self.client.vod_streams if mode == "vod" else self.client.series
+        def _store(items, m=mode):
+            if not isinstance(items, Exception) and items:
+                self._all_streams[m] = items
+        self._run(fetch, _store)
 
     # ---- name search (live/vod/series) -----------------------------------
     def _on_cat_search(self, text):
