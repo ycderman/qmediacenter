@@ -195,7 +195,7 @@ jobs:
             --package dist/ \
             "dist/qmediacenter/=/opt/qmediacenter/" \
             "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
-            "data/qmediacenter.png=/usr/share/pixmaps/qmediacenter.png" \
+            "data/qmediacenter.png=/usr/share/icons/hicolor/256x256/apps/io.github.ycderman.qmediacenter.png" \
             "data/io.github.ycderman.qmediacenter.metainfo.xml=/usr/share/metainfo/io.github.ycderman.qmediacenter.metainfo.xml"
           ls -lh dist/*.deb
       - name: Upload .deb artifact
@@ -241,7 +241,7 @@ jobs:
             --package dist/ \
             "dist/qmediacenter/=/opt/qmediacenter/" \
             "packaging/qmediacenter.desktop=/usr/share/applications/io.github.ycderman.qmediacenter.desktop" \
-            "data/qmediacenter.png=/usr/share/pixmaps/qmediacenter.png" \
+            "data/qmediacenter.png=/usr/share/icons/hicolor/256x256/apps/io.github.ycderman.qmediacenter.png" \
             "data/io.github.ycderman.qmediacenter.metainfo.xml=/usr/share/metainfo/io.github.ycderman.qmediacenter.metainfo.xml"
           ls -lh dist/*.rpm
       - name: Upload .rpm artifact
