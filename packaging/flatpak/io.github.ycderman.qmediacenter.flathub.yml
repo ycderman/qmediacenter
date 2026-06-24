@@ -186,14 +186,9 @@ modules:
       - install -Dm644 LICENSE /app/share/licenses/io.github.ycderman.qmediacenter/LICENSE
     sources:
       # ── Flathub / release build ──
-      # Pin to the exact release tag and commit for reproducibility.
       # Update tag + commit when releasing a new version.
-      # Get the commit: git rev-parse refs/tags/v0.7.0
+      # Get commit with: git rev-list -n 1 vX.Y.Z
       - type: git
         url: https://github.com/ycderman/qmediacenter
         tag: v0.7.0
-        # Replace with the commit the tag points to after pushing:
-        #   git rev-list -n 1 v0.7.0
-        # (Do NOT use "git rev-parse refs/tags/v0.7.0" for annotated tags —
-        # that returns the tag object hash, not the commit hash.)
-        commit: PLACEHOLDER_REPLACE_WITH_REAL_COMMIT_AFTER_TAGGING
+        commit: 9193a174a8d0b312648949086ca4bec90a91245a  # v0.7.0 tag commit

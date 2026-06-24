@@ -65,28 +65,33 @@ present, so skipping this check is safe.
 
 ## Pinning to a release tag
 
-**Requires: the release tag must be pushed to GitHub first** — `nix-prefetch-url`
-and `fetchFromGitHub` fetch from the remote tarball, which only exists after push.
-
-See `packaging/nix/release-example.nix` for a ready-to-use template.
-Its `lib.fakeHash` placeholder must be replaced with the real hash before any
-Nixpkgs PR submission.
-
-The easiest workflow is to build once with `lib.fakeHash` and let Nix tell you
-the correct hash:
+`packaging/nix/release-example.nix` is pinned to **v0.7.0** with the real
+hash — no placeholder. Build directly:
 
 ```bash
 nix-build packaging/nix/release-example.nix
-# Build fails with: got: sha256-AAAA...
-# Paste that value as hash = "sha256-AAAA..."; in release-example.nix, then rebuild.
+./result/bin/qmediacenter --version
 ```
 
-Or prefetch directly (tag must be on remote):
+**v0.7.0 hash values (for reference):**
+
+| Format | Value |
+|--------|-------|
+| SRI (Nix `hash =`, NAR) | `sha256-Z51m1k8AV2BxcevYKfrTJo1upCzezvqK/+ypX+LcYcY=` |
+| hex sha256 (GitHub tarball) | `6723ddf69e2554b26dd63e312e69b9c0440f5bbafbb7e03a2c860377054d8f1d` |
+
+Note: Nix's `fetchFromGitHub` uses the NAR hash of the unpacked source tree,
+not the SHA256 of the raw `.tar.gz`. These are different values.
+
+For future releases, get the new hash with:
 
 ```bash
 nix-prefetch-url --unpack \
-  https://github.com/ycderman/qmediacenter/archive/refs/tags/v0.7.0.tar.gz
+  https://github.com/ycderman/qmediacenter/archive/refs/tags/vX.Y.Z.tar.gz
 ```
+
+Or use `lib.fakeHash` as a placeholder, build once to get the error output,
+then paste the correct hash.
 
 Or with the newer `nix` CLI:
 

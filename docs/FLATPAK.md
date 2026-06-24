@@ -30,14 +30,33 @@ flatpak run io.github.ycderman.qmediacenter
 
 ## Flathub / release build
 
-`packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml` uses `type: git`
-with a pinned tag and commit. Before re-opening the Flathub PR:
+`packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml` is pinned to
+**v0.7.0** with commit `9193a174a8d0b312648949086ca4bec90a91245a`.
+No placeholder remains — the manifest is ready for Flathub PR submission.
 
-1. Tag the release and push it:
-   ```bash
-   git tag -a v0.7.0 -m "QMediaCenter 0.7.0"
-   git push origin v0.7.0
-   ```
+For future releases, update `tag:` and `commit:` in the manifest:
+
+```bash
+# Get commit hash (use rev-list, not rev-parse, for annotated tags):
+git rev-list -n 1 vX.Y.Z
+```
+
+### Flathub PR checklist (v0.7.0)
+
+1. ✅ `type: git` source with pinned tag and commit
+2. ✅ `SETUPTOOLS_SCM_PRETEND_VERSION=0.7.0`
+3. ✅ AppStream metainfo validates cleanly
+4. ✅ Desktop file validates cleanly
+5. ✅ `--filesystem=home` not used; minimal permissions documented
+6. [ ] Record a short screen capture: IPTV channel switching + local library browse
+7. [ ] Fill in the Flathub PR checklist on submission
+8. [ ] Review AI policy compliance (all bundled sources reviewed)
+
+### Testing the Flathub manifest
+
+Before submitting, build from the release manifest (requires internet for git fetch):
+
+1. ~~Tag the release and push it~~ — done (v0.7.0)
 
 2. Get the exact commit hash that the tag points to:
    ```bash

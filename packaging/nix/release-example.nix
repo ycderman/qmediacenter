@@ -1,15 +1,8 @@
-# Example: how to pin qmediacenter.nix to a specific release tag.
-#
-# This file is NOT used by nix-build directly — it is a reference for:
-#   - Nixpkgs PR submissions
-#   - Flake inputs
-#   - Home-manager overlays
-#
-# Usage:
-#   nix-build release-example.nix
-#
-# IMPORTANT: replace lib.fakeHash with the real hash after running once.
-# The build will fail with a hash mismatch and print the correct value.
+# Pinned release build for v0.7.0.
+# Use this as a template for Nixpkgs PRs, flake inputs, and home-manager overlays.
+# Update version, rev, and hash for each new release.
+# Get hash with: nix-build with lib.fakeHash; copy from error output.
+# NOTE: fetchFromGitHub uses NAR hash (not raw tarball sha256).
 
 { pkgs ? import <nixpkgs> {} }:
 
@@ -19,11 +12,6 @@ pkgs.callPackage ./qmediacenter.nix {
     owner  = "ycderman";
     repo   = "qmediacenter";
     rev    = "v0.7.0";
-    # Run the following to get the correct hash after tagging:
-    #   nix-prefetch-url --unpack \
-    #     https://github.com/ycderman/qmediacenter/archive/refs/tags/v0.7.0.tar.gz
-    # Or with nix flakes:
-    #   nix flake prefetch github:ycderman/qmediacenter/v0.7.0
-    hash = pkgs.lib.fakeHash;
+    hash   = "sha256-Z51m1k8AV2BxcevYKfrTJo1upCzezvqK/+ypX+LcYcY=";
   };
 }
