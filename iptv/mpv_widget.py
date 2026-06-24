@@ -43,8 +43,11 @@ class MpvWidget(QOpenGLWidget):
             demuxer_max_back_bytes="2MiB",
             cache_pause=False,
             user_agent="QtIPTV/0.1",
+            log_handler=self._mpv_log,
+            loglevel="warn",
         )
         self._alive = True
+        self._log = __import__("logging").getLogger("mpv")
         self._hwdec = "?"
         self._vw = self._vh = 0
         self._render_ctx = None
@@ -57,6 +60,11 @@ class MpvWidget(QOpenGLWidget):
         self._mpv.observe_property("time-pos",    self._on_time_pos)
         self._mpv.observe_property("pause",       self._on_pause)
         self._mpv.observe_property("track-list",  self._on_tracks)
+
+    @staticmethod
+    def _mpv_log(level, component, message):
+        import logging
+        logging.getLogger(f"mpv.{component}").warning("[%s] %s", level, message.rstrip())
 
     # ---- GL lifecycle -------------------------------------------------
     def initializeGL(self):
