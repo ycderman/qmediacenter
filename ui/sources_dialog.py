@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt
 
 from iptv import config
 from ui.login_dialog import LoginDialog
+from iptv.m3u import M3uClient
 
 
 class SourcesDialog(QDialog):
@@ -29,7 +30,8 @@ class SourcesDialog(QDialog):
         root = QVBoxLayout(self)
         self.tabs = QTabWidget()
         self.tabs.addTab(self._folders_tab(), "📁  Folders")
-        self.tabs.addTab(self._iptv_tab(), "📺  IPTV")
+        self.tabs.addTab(self._iptv_tab(), "📺  Xtream IPTV")
+        self.tabs.addTab(self._m3u_tab(), "📋  M3U Playlist")
         self.tabs.addTab(self._servers_tab(), "🖥  Emby / Plex")
         self.tabs.addTab(self._metadata_tab(), "⭐  Metadata")
         root.addWidget(self.tabs, 1)
@@ -116,6 +118,65 @@ class SourcesDialog(QDialog):
         profiles = [p for p in config.load_profiles() if p.get("name") != name]
         config.save_profiles(profiles)
         self._reload_iptv()
+
+    # ---- M3U Playlist -------------------------------------------------
+    def _m3u_tab(self):
+        w = QWidget(); v = QVBoxLayout(w)
+        v.addWidget(QLabel("M3U playlist sources (URL or local file path):"))
+        self.m3u_list = QListWidget()
+        self._reload_m3u()
+        v.addWidget(self.m3u_list, 1)
+        row = QHBoxLayout()
+        b_add = QPushButton("Add playlist…"); b_add.clicked.connect(self._add_m3u)
+        b_file = QPushButton("Add file…"); b_file.clicked.connect(self._add_m3u_file)
+        b_del = QPushButton("Remove"); b_del.clicked.connect(self._remove_m3u)
+        row.addWidget(b_add); row.addWidget(b_file); row.addWidget(b_del); row.addStretch()
+        v.addLayout(row)
+        hint = QLabel("Supports standard M3U/M3U8 with #EXTINF, tvg-logo and group-title.")
+        hint.setObjectName("Meta"); hint.setWordWrap(True)
+        v.addWidget(hint)
+        return w
+
+    def _reload_m3u(self):
+        self.m3u_list.clear()
+        for p in config.load_m3u_profiles():
+            self.m3u_list.addItem(p.get("name", p.get("url", "?")))
+
+    def _add_m3u(self):
+        url, ok = QInputDialog.getText(self, "Add M3U playlist", "Playlist URL:")
+        url = (url or "").strip()
+        if not ok or not url:
+            return
+        name, ok2 = QInputDialog.getText(self, "Profile name", "Name for this playlist:", text=url.split("/")[-1])
+        if not ok2:
+            return
+        self._save_m3u_profile(name.strip() or url, url)
+
+    def _add_m3u_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Open M3U file", "",
+                                              "Playlists (*.m3u *.m3u8);;All files (*)")
+        if not path:
+            return
+        import os
+        name = os.path.basename(path)
+        self._save_m3u_profile(name, path)
+
+    def _save_m3u_profile(self, name, url):
+        self.status_label = QLabel("Fetching playlist…")
+        profiles = config.load_m3u_profiles()
+        profiles = [p for p in profiles if p.get("name") != name]
+        profiles.append({"name": name, "url": url})
+        config.save_m3u_profiles(profiles)
+        self._reload_m3u()
+
+    def _remove_m3u(self):
+        it = self.m3u_list.currentItem()
+        if not it:
+            return
+        name = it.text()
+        profiles = [p for p in config.load_m3u_profiles() if p.get("name") != name]
+        config.save_m3u_profiles(profiles)
+        self._reload_m3u()
 
     # ---- Emby / Plex --------------------------------------------------
     def _servers_tab(self):

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QMenu
 from PySide6.QtSvg import QSvgRenderer
 
 from iptv import config
+from iptv.m3u import M3uClient
 from iptv.mpv_widget import MpvWidget
 from iptv.downloader import DownloadManager
 from iptv.image_loader import ImageLoader
@@ -199,9 +200,10 @@ class MainWindow(QMainWindow):
         self.iptv_subnav = QWidget()
         iptv_sub = QHBoxLayout(self.iptv_subnav)
         iptv_sub.setContentsMargins(20, 2, 4, 2)
-        iptv_name_lbl = QLabel(f"● {self.profile['name']}" if self.profile else "● IPTV")
-        iptv_name_lbl.setObjectName("Meta")
-        iptv_sub.addWidget(iptv_name_lbl)
+        self.iptv_profile_combo = QComboBox()
+        self.iptv_profile_combo.setMinimumWidth(160)
+        self.iptv_profile_combo.currentIndexChanged.connect(self._on_iptv_profile_changed)
+        iptv_sub.addWidget(self.iptv_profile_combo)
         self.btn_live = QPushButton("📡 Live")
         self.btn_vod = QPushButton("🎬 Movies")
         self.btn_series = QPushButton("📺 Series")
@@ -430,9 +432,55 @@ class MainWindow(QMainWindow):
 
     def _show_iptv(self):
         self._nav_select(self.btn_iptv)
+        self._reload_iptv_combo()
+        self.iptv_subnav.setVisible(True)
+        active = self.iptv_profile_combo.currentData()
+        if active is None:
+            self._show_iptv_empty()
+            return
         if self.mode not in ("live", "vod", "series"):
             self.mode = "live"
         self._set_mode(self.mode)
+
+    def _reload_iptv_combo(self):
+        self.iptv_profile_combo.blockSignals(True)
+        prev = self.iptv_profile_combo.currentData()
+        self.iptv_profile_combo.clear()
+        for p in config.load_profiles():
+            self.iptv_profile_combo.addItem(f"Xtream: {p['name']}", ("xtream", p))
+        for p in config.load_m3u_profiles():
+            self.iptv_profile_combo.addItem(f"M3U: {p['name']}", ("m3u", p))
+        # restore previous selection if still present
+        for i in range(self.iptv_profile_combo.count()):
+            d = self.iptv_profile_combo.itemData(i)
+            if d == prev:
+                self.iptv_profile_combo.setCurrentIndex(i)
+                break
+        self.iptv_profile_combo.blockSignals(False)
+
+    def _on_iptv_profile_changed(self, _idx):
+        active = self.iptv_profile_combo.currentData()
+        if active is None:
+            self._show_iptv_empty()
+            return
+        kind, p = active
+        if kind == "m3u":
+            self.client = M3uClient(p["name"], p["url"])
+        else:
+            from iptv.xtream import XtreamClient
+            self.client = XtreamClient(p["host"], p["username"], p["password"])
+            self.profile = p
+        self.mode = "live"
+        self._set_mode("live")
+
+    def _show_iptv_empty(self):
+        self.iptv_subnav.setVisible(True)
+        self.pages.setCurrentWidget(self.left)
+        self.cat_list.clear()
+        self.content_list.clear()
+        hint = QListWidgetItem("No IPTV sources configured.\nGo to ⚙ Sources → Xtream IPTV or M3U Playlist.")
+        hint.setFlags(Qt.NoItemFlags)
+        self.cat_list.addItem(hint)
 
     def _populate_library(self, source=None):
         if source is not None:
@@ -514,11 +562,11 @@ class MainWindow(QMainWindow):
     def _open_sources(self):
         dlg = SourcesDialog(self)
         dlg.exec()
-        # apply possibly-changed metadata keys live
         mc = config.media_config()
         self.meta = MetadataProvider(self.db, mc.get("tmdb_key"), mc.get("omdb_key"),
                                      imdb=self.imdb)
         self.scanner = LibraryScanner(self.db, self.meta)
+        self._reload_iptv_combo()
         if dlg.scan_requested:
             self._start_scan()
 
@@ -736,6 +784,14 @@ class MainWindow(QMainWindow):
         self.viewing_series = None
         self._search_buf.clear()
         self._nav_select(self.btn_iptv)
+        self.iptv_subnav.setVisible(True)
+        is_m3u = isinstance(self.client, M3uClient)
+        self.btn_vod.setVisible(not is_m3u)
+        self.btn_series.setVisible(not is_m3u)
+        self.btn_downloads.setVisible(not is_m3u)
+        if is_m3u:
+            mode = "live"
+            self.mode = "live"
         for b, m in ((self.btn_live, "live"), (self.btn_vod, "vod"), (self.btn_series, "series")):
             b.setChecked(m == mode)
         grid = mode in ("vod", "series")

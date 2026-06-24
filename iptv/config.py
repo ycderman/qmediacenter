@@ -17,8 +17,9 @@ def _migrate_legacy():
 
 
 _migrate_legacy()
-PROFILES_FILE = os.path.join(CONFIG_DIR, "profiles.json")
-SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
+PROFILES_FILE     = os.path.join(CONFIG_DIR, "profiles.json")
+M3U_PROFILES_FILE = os.path.join(CONFIG_DIR, "m3u_profiles.json")
+SETTINGS_FILE     = os.path.join(CONFIG_DIR, "settings.json")
 
 
 def _ensure_dir():
@@ -36,6 +37,20 @@ def load_profiles():
 def save_profiles(profiles):
     _ensure_dir()
     with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+        json.dump(profiles, f, ensure_ascii=False, indent=2)
+
+
+def load_m3u_profiles():
+    try:
+        with open(M3U_PROFILES_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def save_m3u_profiles(profiles):
+    _ensure_dir()
+    with open(M3U_PROFILES_FILE, "w", encoding="utf-8") as f:
         json.dump(profiles, f, ensure_ascii=False, indent=2)
 
 
