@@ -36,13 +36,13 @@ class MpvWidget(QOpenGLWidget):
             vo="libmpv",
             hwdec="vaapi",
             hwdec_codecs="all",
-            profile="fast",
             input_default_bindings=False,
             cache="yes",
             demuxer_max_bytes="50MiB",
             demuxer_max_back_bytes="2MiB",
             cache_pause=False,
             user_agent="QtIPTV/0.1",
+            vd_lavc_fast=True,
             log_handler=self._mpv_log,
             loglevel="warn",
         )
@@ -73,7 +73,10 @@ class MpvWidget(QOpenGLWidget):
             self._render_ctx = mpv.MpvRenderContext(
                 self._mpv,
                 "opengl",
-                opengl_init_params={"get_proc_address": self._proc_addr_cb},
+                opengl_init_params={
+                    "get_proc_address": self._proc_addr_cb,
+                    "es2": True,
+                },
             )
             self._render_ctx.update_cb = lambda: self._alive and self._frame_ready.emit()
         except Exception as e:
