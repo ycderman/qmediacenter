@@ -39,8 +39,9 @@ class MpvWidget(QOpenGLWidget):
             profile="fast",
             input_default_bindings=False,
             cache="yes",
-            demuxer_max_bytes="200MiB",
-            demuxer_max_back_bytes="100MiB",
+            demuxer_max_bytes="50MiB",
+            demuxer_max_back_bytes="2MiB",
+            cache_pause=False,
             user_agent="QtIPTV/0.1",
         )
         self._alive = True
@@ -130,7 +131,15 @@ class MpvWidget(QOpenGLWidget):
             self.seek(10 if delta > 0 else -10, "relative")
         event.accept()
 
-    def play(self, url):
+    def play(self, url, live=False):
+        if live:
+            self._mpv["cache-pause"] = False
+            self._mpv["demuxer-max-bytes"] = "4MiB"
+            self._mpv["demuxer-max-back-bytes"] = "512KiB"
+        else:
+            self._mpv["cache-pause"] = False
+            self._mpv["demuxer-max-bytes"] = "50MiB"
+            self._mpv["demuxer-max-back-bytes"] = "2MiB"
         self._mpv.play(url)
         self._mpv.pause = False
 

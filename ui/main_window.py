@@ -1051,7 +1051,7 @@ class MainWindow(QMainWindow):
             return
         # Live channels play straight away on selection (no Play click needed).
         if self.mode == "live":
-            self._play(self.client.live_url(d.get("stream_id")), d.get("name"))
+            self._play(self.client.live_url(d.get("stream_id")), d.get("name"), kind="live")
             self.info_title.setText(d.get("name") or "?")
             self.info_meta.setText(""); self.info_plot.setText("")
             self.info_poster.clear()
@@ -1206,7 +1206,8 @@ class MainWindow(QMainWindow):
         pos, _dur = self.db.get_progress(item_key) if item_key else (0.0, 0.0)
         self._resume_target = pos if pos > 5 else 0.0
         self.pos_slider.setValue(0)
-        self.player.play(url)
+        is_live = (kind == "live")
+        self.player.play(url, live=is_live)
         self._show_controls()
         if self.mpris:
             self.mpris.on_play(title, self._current_poster)
