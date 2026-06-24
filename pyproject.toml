@@ -46,41 +46,48 @@ Homepage = "https://github.com/ycderman/qmediacenter"
 "Bug Tracker" = "https://github.com/ycderman/qmediacenter/issues"
 Repository = "https://github.com/ycderman/qmediacenter"
 
+# On Linux, console_scripts and gui_scripts behave identically.
+# We expose a single entry point; terminal launch (for log output) is desirable
+# so console_scripts is preferred over gui_scripts on Linux.
 [project.scripts]
 qmediacenter = "main:main"
 
-[project.gui-scripts]
-qmediacenter = "main:main"
+# ── Packages & data files ──────────────────────────────────────────────────
 
 [tool.setuptools]
-packages = ["iptv", "media", "ui", "themes"]
+packages = ["iptv", "media", "ui", "themes", "data", "qmediacenter"]
 py-modules = ["main"]
 
 [tool.setuptools.package-data]
-# QSS theme files must ship inside the wheel so importlib.resources can find them
+# QSS theme files — accessed via importlib.resources at runtime
 "themes" = ["*.qss"]
-# Icon shipped inside the `data` directory is accessed via filesystem path in main.py.
-# Include it in the sdist via MANIFEST.in; wheel install via data_files below is preferred
-# for system-wide placement (handled by deb/rpm/flatpak packaging instead).
+# App icon and AppStream metainfo — accessed via importlib.resources at runtime
+"data" = ["*.png", "*.xml", "*.svg"]
+# Marker files
 "*" = ["py.typed"]
 
+# ── setuptools-scm version ────────────────────────────────────────────────
+
 [tool.setuptools_scm]
-write_to = "qmediacenter_version.py"
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+
+# ── Linting ───────────────────────────────────────────────────────────────
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = ["dist", "build", "__pycache__", "packaging/pyinstaller"]
+exclude = ["dist", "build", "__pycache__", "packaging/pyinstaller", "qmediacenter.egg-info"]
 
 [tool.ruff.lint]
-select = ["F", "E711", "E712", "W605", "E501"]
-ignore = ["F401", "E402", "E501"]
+select = ["F", "E711", "E712", "W605"]
+ignore = ["F401", "E402"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+# ── Tests ─────────────────────────────────────────────────────────────────
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "test_ui.py"]
@@ -90,5 +97,5 @@ python_functions = ["test_*"]
 addopts = "-v"
 
 [tool.coverage.run]
-source = ["iptv", "media", "ui", "main"]
-omit = ["dist/*", "build/*", "packaging/*", "tests/conftest.py"]
+source = ["iptv", "media", "ui", "main", "qmediacenter"]
+omit = ["dist/*", "build/*", "packaging/*", "tests/conftest.py", "qmediacenter.egg-info/*"]

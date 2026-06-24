@@ -1,6 +1,6 @@
 # QMediaCenter — Professionalization Roadmap
 
-> Generated: 2026-06-24 | Status: Sprint 1 in progress
+> Generated: 2026-06-24 | Updated: 2026-06-24 | Status: Sprint 2 complete
 
 ---
 
@@ -170,22 +170,26 @@ test_ui.py              1 154-line monolithic unittest file
 - [x] Startup without login dialog
 - [x] Flatpak local build
 - [x] fbo-format fix (GL INVALID_ENUM)
-- [ ] pyproject.toml + source install
-- [ ] ThemeManager + dark theme
-- [ ] tests/ directory
+- [x] pyproject.toml + source install (`pip install -e .`, `pip install dist/*.whl`)
+- [x] ThemeManager + Breeze Dark theme
+- [x] tests/ directory (pytest, 61 tests)
+- [x] `data/` and `themes/` as Python packages — importlib.resources
+- [x] `--version` / `--help` CLI without Qt/display
+- [x] Wheel contents verified: themes, icon, metainfo all present
+- [x] CI wheel-build + clean-venv install smoke test
 
-### 0.7.0 — Packaging & Distribution
-- [ ] `pyproject.toml` complete
-- [ ] `pip install .` / `pipx install .` works
+### 0.7.0 — Packaging & Distribution (Sprint 3)
+- [x] `pyproject.toml` complete
+- [x] `pip install .` / `pipx install .` works
+- [x] Split tests into `tests/`
+- [x] `pytest` + CI job
 - [ ] RPM spec for OBS/Fedora
 - [ ] Debian `debian/` structure
 - [ ] AUR `PKGBUILD`
-- [ ] Nixpkgs derivation updated
-- [ ] Flathub PR reopened with checklist
-- [ ] `CHANGELOG.md` and SemVer discipline
+- [ ] Nixpkgs `buildPythonApplication` derivation
+- [ ] Flathub PR reopened with checklist + video
 - [ ] `CONTRIBUTING.md`
-- [ ] Split tests into `tests/`
-- [ ] `pytest` + coverage CI job
+- [ ] AppStream `releases` updated for 0.6.x tags
 
 ### 0.8.0 — Architecture
 - [ ] `MainWindow` split into page controllers
@@ -236,5 +240,35 @@ test_ui.py              1 154-line monolithic unittest file
 - `pyproject.toml` makes this clean
 
 ---
+
+---
+
+## Sprint Summary
+
+### Sprint 1 — Completed 2026-06-24
+- `pyproject.toml` + `ThemeManager` + `themes/` package
+- `CHANGELOG.md`, `MANIFEST.in`, `tests/` directory (47 tests)
+- CI: pytest job, spec path fix, bundle needs pytest
+
+### Sprint 2 — Completed 2026-06-24
+- `data/` as Python package → `importlib.resources` for icon + metainfo
+- `qmediacenter/` package with `__version__`
+- `--version` / `--help` CLI (no display needed)
+- `project.scripts` deduplication (single entry point)
+- `tests/test_resources.py` (15 new tests; 61 total)
+- CI `wheel-build` job: build → verify wheel contents → clean venv install → smoke
+- Wheel verified: all resources present, install+run confirmed
+
+### Sprint 3 — Proposed
+Priority: distro packaging files so the project can be submitted to real repos.
+
+1. `packaging/nix/qmediacenter.nix` — `buildPythonApplication` derivation
+2. `packaging/rpm/qmediacenter.spec` — proper RPM spec for OBS/Fedora
+3. `packaging/arch/PKGBUILD` — AUR package
+4. `packaging/debian/` — `control`, `rules`, `copyright`, `watch`
+5. AppStream `releases` updated for all 0.6.x tags
+6. `CONTRIBUTING.md`
+7. Flathub PR re-opened with proper checklist + demo video (manual)
+8. `data_files` or post-install hooks for `.desktop` + metainfo system paths
 
 *This document is updated at the end of each sprint.*

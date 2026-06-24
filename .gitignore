@@ -3,3 +3,9 @@ __pycache__/
 result
 build/
 dist/
+*.egg-info/
+qmediacenter_version.py
+.pytest_cache/
+.ruff_cache/
+*.whl
+*.tar.gz
