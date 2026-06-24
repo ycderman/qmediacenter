@@ -1,0 +1,106 @@
+app-id: io.github.ycderman.qmediacenter
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: qmediacenter
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=home
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --own-name=org.mpris.MediaPlayer2.qmediacenter
+  - --talk-name=org.mpris.MediaPlayer2.*
+  - --socket=session-bus
+  - --env=LC_NUMERIC=C
+  - --env=QT_QPA_PLATFORM=wayland;xcb
+
+modules:
+  # ── libmpv ────────────────────────────────────────────────────────────────
+  - shared-modules/libmpv/libmpv.json
+
+  # ── Python wheel dependencies ─────────────────────────────────────────────
+  - name: python3-shiboken6
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app shiboken6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/be/82/c1c6932f9849bc5e75c93c38a29419505a6e3e0037261e28f3e7ecbf2751/shiboken6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
+        sha256: f3f5337a3a8fc660ba1462265bd9a2bdda9588f8d90fbc3d5ac4ce3134c11e59
+
+  - name: python3-pyside6-essentials
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app pyside6_essentials-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/85/e8/9396cf11a60f80175bb3c5c1d498d84e87b7af653ab4ea001acf821a3981/pyside6_essentials-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
+        sha256: c70d5544e892b201a677b615156fab6a0fef865e7fc287f55a0eae00a682e83f
+
+  - name: python3-pyside6
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app pyside6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/34/0e/1e9841cc46196c55ac3eac0b8e08044a88cc70c8cc29e9dc1e33b2ced2b7/pyside6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
+        sha256: 6485aebec8eba4e55d1ec1cebe68ca1413589880cc8ccd8a49acae852ec6cfb3
+
+  - name: python3-mpv
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app mpv-1.0.8-py3-none-any.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/f4/cf/0d5f52753366ecf2c3d763e331dcda54b0f20a1a8e52b175feb9c625399d/mpv-1.0.8-py3-none-any.whl
+        sha256: dcf77f612e3f5ce49bd89393f37d286de7ac290db6b0800f1fdcfe0aeb5ba9b8
+
+  - name: python3-pyopengl
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app pyopengl-3.1.10-py3-none-any.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/de/e4/1ba6f44e491c4eece978685230dde56b14d51a0365bc1b774ddaa94d14cd/pyopengl-3.1.10-py3-none-any.whl
+        sha256: 794a943daced39300879e4e47bd94525280685f42dbb5a998d336cfff151d74f
+
+  - name: python3-requests
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app requests-2.34.2-py3-none-any.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
+        sha256: 2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
+
+  - name: python3-yt-dlp
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --find-links=. --prefix=/app yt_dlp-2026.6.9-py3-none-any.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/f3/ee/188a3dadf9dfdac713243521f919feca1cd091d4358c9ea7e8ebb710a7cc/yt_dlp-2026.6.9-py3-none-any.whl
+        sha256: 442ba4c75724b9496144c8434b617962ee08d0ee7c26ec663848fe9b78d5a3e4
+
+  # ── QMediaCenter ──────────────────────────────────────────────────────────
+  - name: qmediacenter
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/share/qmediacenter
+      - cp -r main.py iptv ui media data /app/share/qmediacenter/
+      - install -Dm755 packaging/qmediacenter.sh /app/bin/qmediacenter
+      - install -Dm644 data/io.github.ycderman.qmediacenter.metainfo.xml
+          /app/share/metainfo/io.github.ycderman.qmediacenter.metainfo.xml
+      - install -Dm644 packaging/qmediacenter.desktop
+          /app/share/applications/io.github.ycderman.qmediacenter.desktop
+      - install -Dm644 data/qmediacenter.png
+          /app/share/icons/hicolor/256x256/apps/io.github.ycderman.qmediacenter.png
+    sources:
+      - type: git
+        url: https://github.com/ycderman/qmediacenter
+        tag: v0.5.5
+        commit: 086c923982effc0c5c64b2da7db9ac204e52632e
