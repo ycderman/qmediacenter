@@ -860,19 +860,26 @@ class MainWindow(QMainWindow):
         self._run(fn, self._populate_content)
 
     def _load_recently_added(self):
+        import time as _time
+        _t0 = _time.monotonic()
         recent = self.db.cache_get(f"xtream_{self.mode}_recent", max_age=self._STREAM_CACHE_TTL)
         if recent:
+            print(f"[RECENT] disk cache hit — {len(recent)} items — {(_time.monotonic()-_t0)*1000:.0f}ms", flush=True)
             self._show_recently_added(recent)
             return
+        print(f"[RECENT] no cache, fetching from API…", flush=True)
         fetch = (self.client.vod_streams if self.mode == "vod" else self.client.series)
-        def _fetched(items):
+        def _fetched(items, _t=_t0):
+            elapsed = (_time.monotonic() - _t) * 1000
             if not isinstance(items, Exception) and items:
+                print(f"[RECENT] API fetch done — {len(items)} items — {elapsed:.0f}ms", flush=True)
                 recent = self._sort_recent(items)
                 self.db.cache_put(f"xtream_{self.mode}_recent", recent)
                 self.db.cache_put(f"xtream_{self.mode}_streams", items)
                 del items
                 self._show_recently_added(recent)
             else:
+                print(f"[RECENT] API error — {elapsed:.0f}ms", flush=True)
                 self._show_recently_added(items)
         self._run(fetch, _fetched)
 
