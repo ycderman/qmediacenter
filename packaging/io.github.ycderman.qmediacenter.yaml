@@ -174,5 +174,5 @@ modules:
     sources:
       - type: git
         url: https://github.com/ycderman/qmediacenter
-        tag: v0.5.6
-        commit: f4ed6732646fabd6ffdb7b51291d4901476fbb11
+        tag: v0.6.7
+        commit: ec805c0bdd253100e8048228ba36747dd8bcfcdc
