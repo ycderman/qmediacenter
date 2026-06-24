@@ -847,20 +847,31 @@ class MainWindow(QMainWindow):
         self._populate_content_sorted(recent)
 
     def _populate_content_sorted(self, items):
-        """Like _populate_content but skips alphabetical re-sort."""
         self.content_list.clear()
         if not items:
             self.content_header.setText("Empty"); return
-        self.content_header.setText(f"{len(items)} items")
-        for d in items:
-            name = d.get("name") or d.get("title") or "?"
-            it = QListWidgetItem(name)
-            it.setData(ROLE, d)
-            it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
-            it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
-            url = d.get("stream_icon") or d.get("cover")
-            self._load_poster(it, url)
-            self.content_list.addItem(it)
+        total = len(items)
+        self.content_header.setText(f"{total} items")
+        batch = 50
+        it_list = list(items)
+
+        def add_batch(offset=0):
+            self.content_list.setUpdatesEnabled(False)
+            for d in it_list[offset:offset + batch]:
+                name = d.get("name") or d.get("title") or "?"
+                it = QListWidgetItem(name)
+                it.setData(ROLE, d)
+                it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
+                it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
+                url = d.get("stream_icon") or d.get("cover")
+                self._load_poster(it, url)
+                self.content_list.addItem(it)
+            self.content_list.setUpdatesEnabled(True)
+            next_offset = offset + batch
+            if next_offset < total:
+                QTimer.singleShot(0, lambda o=next_offset: add_batch(o))
+
+        add_batch()
 
     def _populate_content(self, items):
         self.content_list.clear()
