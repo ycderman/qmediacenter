@@ -30,12 +30,79 @@ finish-args:
   - --socket=session-bus
   - --env=LC_NUMERIC=C
 
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /lib/cmake
+  - /lib/build-python-deps
+  - /share/doc
+  - /share/man
+  - '*.a'
+  - '*.la'
+
 cleanup-commands:
   - /app/cleanup-BaseApp.sh
 
 modules:
-  # ── libmpv ────────────────────────────────────────────────────────────────
-  - shared-modules/libmpv/libmpv.json
+  # ── libass (subtitle rendering) ───────────────────────────────────────────
+  - name: libass
+    config-opts:
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.gz
+        sha256: da7c348deb6fa6c24507afab2dee7545ba5dd5bbf90a137bfe9e738f7df68537
+
+  # ── jinja2 (build-time dep of libplacebo's shader preprocessor) ──────────
+  - name: python3-build-jinja2
+    buildsystem: simple
+    build-commands:
+      - pip3 install --exists-action=i --no-index --find-links="file://${PWD}"
+          --target=${FLATPAK_DEST}/lib/build-python-deps --no-build-isolation "MarkupSafe==2.1.5" "jinja2==3.1.6"
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/87/5b/aae44c6655f3801e81aa3eef09dbbf012431987ba564d7231722f68df02d/MarkupSafe-2.1.5.tar.gz
+        sha256: d283d37a890ba4c1ae73ffadf8046435c76e7bc2247bbb63c00bd1a709c6544b
+      - type: file
+        url: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+        sha256: 85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
+
+  # ── libplacebo (GPU shader lib required by mpv 0.35+) ────────────────────
+  - name: libplacebo
+    buildsystem: meson
+    build-options:
+      env:
+        - PYTHONPATH=/app/lib/build-python-deps
+    config-opts:
+      - -Dvulkan=enabled
+      - -Dglslang=enabled
+      - -Dopengl=disabled
+      - -Dd3d11=disabled
+      - -Ddemos=false
+    sources:
+      - type: archive
+        url: https://github.com/haasn/libplacebo/archive/refs/tags/v6.338.2.tar.gz
+        sha256: 2f1e624e09d72a8c9db70f910f7560e764a1c126dae42acc5b3bcef836a7aec6
+
+  # ── mpv (libmpv only, no player binary) ──────────────────────────────────
+  - name: mpv
+    buildsystem: meson
+    config-opts:
+      - -Dlibmpv=true
+      - -Dcplayer=false
+      - -Dbuild-date=false
+      - -Dgl=enabled
+      - -Dvaapi=enabled
+      - -Dwayland=enabled
+      - -Dx11=disabled
+      - -Dsdl2=disabled
+      - -Dalsa=disabled
+      - -Dpulse=enabled
+      - -Dmanpage-build=disabled
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.39.0.tar.gz
+        sha256: 2ca92437affb62c2b559b4419ea4785c70d023590500e8a52e95ea3ab4554683
 
   # ── Python dependencies (PySide6 comes from BaseApp) ─────────────────────
   - name: python3-mpv
@@ -107,5 +174,5 @@ modules:
     sources:
       - type: git
         url: https://github.com/ycderman/qmediacenter
-        tag: v0.5.5
-        commit: 086c923982effc0c5c64b2da7db9ac204e52632e
+        tag: v0.5.6
+        commit: f4ed6732646fabd6ffdb7b51291d4901476fbb11
