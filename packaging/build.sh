@@ -10,7 +10,7 @@ DIST="dist/qmediacenter"
 cd "$(dirname "$0")/.."
 
 echo "==> PyInstaller build (v$VERSION)"
-pyinstaller qmediacenter.spec --clean --noconfirm
+pyinstaller packaging/pyinstaller/qmediacenter.spec --clean --noconfirm
 
 echo "==> DEB paketi"
 fpm -s dir -t deb \

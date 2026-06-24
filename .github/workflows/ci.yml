@@ -99,6 +99,30 @@ jobs:
           LC_NUMERIC: C
         run: python test_ui.py
 
+  # ── pytest (new test suite) ───────────────────────────────────────────────
+  pytest:
+    name: pytest unit tests
+    runs-on: ubuntu-latest
+    needs: syntax
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libmpv2 libgles2 libegl1 libxkbcommon0 libdbus-1-3 \
+            libfontconfig1 libfreetype6 libgl1
+      - name: Install Python dependencies
+        run: pip install --quiet pyside6 mpv pyopengl requests pytest
+      - name: Run pytest
+        env:
+          QT_QPA_PLATFORM: offscreen
+          LC_NUMERIC: C
+        run: pytest tests/ -v --tb=short
+
   # ── PyInstaller bundle (Ubuntu 22.04) ─────────────────────────────────────
   bundle:
     name: PyInstaller bundle
@@ -140,7 +164,7 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Version: $V"
       - name: Build with PyInstaller
-        run: pyinstaller qmediacenter.spec --clean --noconfirm
+        run: pyinstaller packaging/pyinstaller/qmediacenter.spec --clean --noconfirm
       - name: Verify binary is not Nix-linked
         run: |
           INTERP=$(readelf -l dist/qmediacenter/qmediacenter \

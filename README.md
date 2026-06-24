@@ -12,7 +12,7 @@
 
 ## Features
 
-- **IPTV (Xtream Codes)** — Live TV, Movies (VOD) and Series, with category browsing, full-catalog search by title, and downloads
+- **IPTV (Xtream Codes + M3U)** — Live TV, Movies (VOD) and Series, with category browsing, full-catalog search by title, and downloads
 - **Emby & Plex** — browse and play your server libraries directly, with auto user detection
 - **Local / network library** — scan folders (NFS, SMB, USB) for video, music and photos; filenames parsed into titles, enriched with posters and IMDb ratings
 - **Hardware decoding** — VAAPI on Linux (Intel, AMD); every codec mpv supports: HEVC, AV1, H.264, AC-3, DTS, …
@@ -20,9 +20,9 @@
 - **Home screen** — rows for Continue Watching, Favourites, Recently Added, and Movies per source (Emby / Plex / local)
 - **Source badges** — every item in the home screen shows which source it comes from
 - **Alphabetical sorting** — movie and series lists sorted A→Z throughout
-- **In-app Sources menu** — add IPTV accounts, Emby/Plex servers, local folders and metadata API keys; nothing hard-coded
+- **In-app Sources menu** — add IPTV accounts (Xtream or M3U), Emby/Plex servers, local folders and metadata API keys; nothing hard-coded
 - **Wayland & X11** — mpv renders via OpenGL render API; works on both
-- **KDE Breeze Light** theme; accent colour follows the desktop
+- **Breeze Light / Dark** themes; accent colour follows the desktop
 
 ## Screenshots
 
@@ -54,19 +54,35 @@ sudo dnf install ./qmediacenter_x86_64.rpm
 
 ### NixOS
 
-```nix
-# pkgs/qmediacenter.nix — see the file in this repo for the full derivation
-pkgs.callPackage ./pkgs/qmediacenter.nix { }
+```bash
+# Use the derivation at package.nix in this repo
+nix-build package.nix
+./result/bin/qplayer
 ```
+
+> A proper `buildPythonApplication` derivation for Nixpkgs is planned for 0.7.0.
 
 ### From source
 
 ```bash
 git clone https://github.com/ycderman/qmediacenter
 cd qmediacenter
-# Install dependencies: PySide6, python-mpv, PyOpenGL, requests, yt-dlp
+pip install -e .
+qmediacenter
+```
+
+Or without installing:
+
+```bash
 pip install pyside6 mpv pyopengl requests yt-dlp
 python main.py
+```
+
+### pipx (isolated install)
+
+```bash
+pipx install git+https://github.com/ycderman/qmediacenter
+qmediacenter
 ```
 
 ## Navigation
@@ -86,9 +102,10 @@ python main.py
 ## Architecture
 
 ```
-main.py                entry point — QApplication + login + main window
+main.py                entry point — QApplication + main window
 iptv/
   xtream.py            Xtream Codes API client
+  m3u.py               M3U/M3U8 parser and client
   config.py            profiles / settings + media-center config
   mpv_widget.py        QOpenGLWidget rendering libmpv via OpenGL render API
   downloader.py        resumable threaded HTTP download manager
@@ -99,11 +116,16 @@ media/
   local_scanner.py     local / network folder scanner + filename parser
   emby.py              Emby library sync
   plex.py              Plex library sync
+  mpris.py             MPRIS2 + ScreenSaver inhibit
 ui/
-  login_dialog.py      Xtream profile entry / selection
+  login_dialog.py      Xtream profile entry (used from Sources dialog)
   sources_dialog.py    Sources & settings dialog
   main_window.py       navigation, content / library pages, player, home screen
-  style.py             KDE Breeze Light Qt stylesheet
+  style.py             Breeze Light QSS (legacy; ThemeManager is the future path)
+  theme_manager.py     Theme loading, accent injection, dark/light switching
+themes/
+  breeze-light.qss     KDE Breeze Light palette
+  breeze-dark.qss      KDE Breeze Dark palette
 ```
 
 ## Optional metadata (posters & ratings)

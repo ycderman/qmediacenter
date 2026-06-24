@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=68", "setuptools-scm"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "qmediacenter"
+dynamic = ["version"]
+description = "Qt6/libmpv media center — IPTV, Emby, Plex and local media"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["iptv", "media", "player", "mpv", "emby", "plex", "qt6"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video :: Display",
+    "Topic :: Multimedia :: Video",
+]
+dependencies = [
+    "PySide6>=6.6",
+    "mpv>=1.0",
+    "PyOpenGL>=3.1",
+    "requests>=2.28",
+    "yt-dlp>=2024.1",
+]
+
+[project.optional-dependencies]
+dbus = ["dbus-python", "PyGObject"]
+dev = [
+    "pytest>=8",
+    "pytest-qt",
+    "ruff>=0.4",
+    "build",
+    "pyinstaller",
+]
+
+[project.urls]
+Homepage = "https://github.com/ycderman/qmediacenter"
+"Bug Tracker" = "https://github.com/ycderman/qmediacenter/issues"
+Repository = "https://github.com/ycderman/qmediacenter"
+
+[project.scripts]
+qmediacenter = "main:main"
+
+[project.gui-scripts]
+qmediacenter = "main:main"
+
+[tool.setuptools]
+packages = ["iptv", "media", "ui"]
+py-modules = ["main"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.setuptools_scm]
+write_to = "qmediacenter_version.py"
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["dist", "build", "__pycache__", "packaging/pyinstaller"]
+
+[tool.ruff.lint]
+select = ["F", "E711", "E712", "W605", "E501"]
+ignore = ["F401", "E402", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "test_ui.py"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["iptv", "media", "ui", "main"]
+omit = ["dist/*", "build/*", "packaging/*", "tests/conftest.py"]
