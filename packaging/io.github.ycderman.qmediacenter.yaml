@@ -1,7 +1,17 @@
 app-id: io.github.ycderman.qmediacenter
-runtime: org.freedesktop.Platform
-runtime-version: '24.08'
-sdk: org.freedesktop.Sdk
+
+runtime: org.kde.Platform
+runtime-version: '6.8'
+sdk: org.kde.Sdk
+
+# PySide6 is provided by the official Flathub PySide BaseApp —
+# no need to bundle Qt or PySide6 ourselves.
+base: io.qt.PySide.BaseApp
+base-version: '6.8'
+build-options:
+  env:
+    - PIP_DISABLE_PIP_VERSION_CHECK=1
+
 command: qmediacenter
 
 finish-args:
@@ -9,60 +19,40 @@ finish-args:
   - --share=ipc
   - --socket=wayland
   - --socket=fallback-x11
+  - --socket=pulseaudio
   - --device=dri
-  - --filesystem=home
+  - --filesystem=xdg-videos:ro
+  - --filesystem=xdg-music:ro
+  - --filesystem=xdg-pictures:ro
   - --talk-name=org.freedesktop.ScreenSaver
   - --own-name=org.mpris.MediaPlayer2.qmediacenter
   - --talk-name=org.mpris.MediaPlayer2.*
   - --socket=session-bus
   - --env=LC_NUMERIC=C
-  - --env=QT_QPA_PLATFORM=wayland;xcb
+
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
 
 modules:
   # ── libmpv ────────────────────────────────────────────────────────────────
   - shared-modules/libmpv/libmpv.json
 
-  # ── Python wheel dependencies ─────────────────────────────────────────────
-  - name: python3-shiboken6
-    buildsystem: simple
-    build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app shiboken6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
-    sources:
-      - type: file
-        url: https://files.pythonhosted.org/packages/be/82/c1c6932f9849bc5e75c93c38a29419505a6e3e0037261e28f3e7ecbf2751/shiboken6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
-        sha256: f3f5337a3a8fc660ba1462265bd9a2bdda9588f8d90fbc3d5ac4ce3134c11e59
-
-  - name: python3-pyside6-essentials
-    buildsystem: simple
-    build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app pyside6_essentials-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
-    sources:
-      - type: file
-        url: https://files.pythonhosted.org/packages/85/e8/9396cf11a60f80175bb3c5c1d498d84e87b7af653ab4ea001acf821a3981/pyside6_essentials-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
-        sha256: c70d5544e892b201a677b615156fab6a0fef865e7fc287f55a0eae00a682e83f
-
-  - name: python3-pyside6
-    buildsystem: simple
-    build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app pyside6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
-    sources:
-      - type: file
-        url: https://files.pythonhosted.org/packages/34/0e/1e9841cc46196c55ac3eac0b8e08044a88cc70c8cc29e9dc1e33b2ced2b7/pyside6-6.9.3-cp39-abi3-manylinux_2_28_x86_64.whl
-        sha256: 6485aebec8eba4e55d1ec1cebe68ca1413589880cc8ccd8a49acae852ec6cfb3
-
+  # ── Python dependencies (PySide6 comes from BaseApp) ─────────────────────
   - name: python3-mpv
     buildsystem: simple
     build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app mpv-1.0.8-py3-none-any.whl
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+          --prefix=${FLATPAK_DEST} "mpv==1.0.8" --no-build-isolation
     sources:
       - type: file
         url: https://files.pythonhosted.org/packages/f4/cf/0d5f52753366ecf2c3d763e331dcda54b0f20a1a8e52b175feb9c625399d/mpv-1.0.8-py3-none-any.whl
         sha256: dcf77f612e3f5ce49bd89393f37d286de7ac290db6b0800f1fdcfe0aeb5ba9b8
 
-  - name: python3-pyopengl
+  - name: python3-PyOpenGL
     buildsystem: simple
     build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app pyopengl-3.1.10-py3-none-any.whl
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+          --prefix=${FLATPAK_DEST} "PyOpenGL==3.1.10" --no-build-isolation
     sources:
       - type: file
         url: https://files.pythonhosted.org/packages/de/e4/1ba6f44e491c4eece978685230dde56b14d51a0365bc1b774ddaa94d14cd/pyopengl-3.1.10-py3-none-any.whl
@@ -71,16 +61,30 @@ modules:
   - name: python3-requests
     buildsystem: simple
     build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app requests-2.34.2-py3-none-any.whl
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+          --prefix=${FLATPAK_DEST} "requests==2.34.2" --no-build-isolation
     sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/ef/2f/c5464532e965badff2f4c4c1a3a83f5697f0d7c407ed0cda44aaa99bb451/certifi-2026.6.17-py3-none-any.whl
+        sha256: 2227dcbaafe0d2f59279d1762ddddc37783ed4354594f194ffc31d20f41fc3db
+      - type: file
+        url: https://files.pythonhosted.org/packages/db/8f/61959034484a4a7c527811f4721e75d02d653a35afb0b6054474d8185d4c/charset_normalizer-3.4.7-py3-none-any.whl
+        sha256: 3dce51d0f5e7951f8bb4900c257dad282f49190fdbebecd4ba99bcc41fef404d
+      - type: file
+        url: https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl
+        sha256: 7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2
       - type: file
         url: https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
         sha256: 2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
+      - type: file
+        url: https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl
+        sha256: 9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
 
   - name: python3-yt-dlp
     buildsystem: simple
     build-commands:
-      - pip3 install --no-index --find-links=. --prefix=/app yt_dlp-2026.6.9-py3-none-any.whl
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+          --prefix=${FLATPAK_DEST} "yt-dlp==2026.6.9" --no-build-isolation
     sources:
       - type: file
         url: https://files.pythonhosted.org/packages/f3/ee/188a3dadf9dfdac713243521f919feca1cd091d4358c9ea7e8ebb710a7cc/yt_dlp-2026.6.9-py3-none-any.whl
@@ -99,6 +103,7 @@ modules:
           /app/share/applications/io.github.ycderman.qmediacenter.desktop
       - install -Dm644 data/qmediacenter.png
           /app/share/icons/hicolor/256x256/apps/io.github.ycderman.qmediacenter.png
+      - install -Dm644 LICENSE /app/share/licenses/io.github.ycderman.qmediacenter/LICENSE
     sources:
       - type: git
         url: https://github.com/ycderman/qmediacenter
