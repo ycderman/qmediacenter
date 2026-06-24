@@ -771,11 +771,18 @@ class MainWindow(QMainWindow):
         if self.mode in ("vod", "series") and self.mode not in self._all_streams:
             self._prefetch_streams(self.mode)
 
+    _STREAM_CACHE_TTL = 2 * 3600  # 2 hours
+
     def _prefetch_streams(self, mode):
+        disk = self.db.cache_get(f"xtream_{mode}_streams", max_age=self._STREAM_CACHE_TTL)
+        if disk:
+            self._all_streams[mode] = disk
+            return
         fetch = self.client.vod_streams if mode == "vod" else self.client.series
         def _store(items, m=mode):
             if not isinstance(items, Exception) and items:
                 self._all_streams[m] = items
+                self.db.cache_put(f"xtream_{m}_streams", items)
         self._run(fetch, _store)
 
     # ---- name search (live/vod/series) -----------------------------------
@@ -841,10 +848,16 @@ class MainWindow(QMainWindow):
         if cached is not None:
             self._show_recently_added(cached)
             return
+        disk = self.db.cache_get(f"xtream_{self.mode}_streams", max_age=self._STREAM_CACHE_TTL)
+        if disk:
+            self._all_streams[self.mode] = disk
+            self._show_recently_added(disk)
+            return
         fetch = (self.client.vod_streams if self.mode == "vod" else self.client.series)
         def _fetched(items):
             if not isinstance(items, Exception) and items:
                 self._all_streams[self.mode] = items
+                self.db.cache_put(f"xtream_{self.mode}_streams", items)
             self._show_recently_added(items)
         self._run(fetch, _fetched)
 
