@@ -856,25 +856,36 @@ class MainWindow(QMainWindow):
         self._append_recent_batch()
 
     _RECENT_PAGE = 250
+    _RECENT_CHUNK = 30
 
     def _append_recent_batch(self):
         items = self._recent_items
         offset = self._recent_offset
         if offset >= len(items):
             return
-        batch = items[offset:offset + self._RECENT_PAGE]
-        self.content_list.setUpdatesEnabled(False)
-        for d in batch:
-            name = d.get("name") or d.get("title") or "?"
-            it = QListWidgetItem(name)
-            it.setData(ROLE, d)
-            it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
-            it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
-            url = d.get("stream_icon") or d.get("cover")
-            self._load_poster(it, url)
-            self.content_list.addItem(it)
-        self.content_list.setUpdatesEnabled(True)
-        self._recent_offset += len(batch)
+        end = min(offset + self._RECENT_PAGE, len(items))
+        self._recent_offset = end
+
+        def _add_chunk(start):
+            chunk = items[start:start + self._RECENT_CHUNK]
+            if not chunk:
+                return
+            self.content_list.setUpdatesEnabled(False)
+            for d in chunk:
+                name = d.get("name") or d.get("title") or "?"
+                it = QListWidgetItem(name)
+                it.setData(ROLE, d)
+                it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
+                it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
+                url = d.get("stream_icon") or d.get("cover")
+                self._load_poster(it, url)
+                self.content_list.addItem(it)
+            self.content_list.setUpdatesEnabled(True)
+            nxt = start + self._RECENT_CHUNK
+            if nxt < end:
+                QTimer.singleShot(50, lambda s=nxt: _add_chunk(s))
+
+        _add_chunk(offset)
 
     def _on_content_scroll(self, value):
         if not self._recent_items or self._recent_offset >= len(self._recent_items):
