@@ -98,16 +98,10 @@ The author (ycderman) is the sole maintainer and takes responsibility for all co
 
 ## Screenshots checklist
 
-AppStream metainfo currently has no `<screenshots>` element.
-Before submitting to Flathub, add at least one screenshot.
-
-- [ ] Main home screen (Continue Watching / Recently Added)
-- [ ] IPTV channel list
-- [ ] Local library view
-- [ ] Playback with media controls visible
-
-Screenshot format: PNG, 16:9, 1280×720 or larger.
-Store in `data/screenshots/` and reference in metainfo.
+- ✅ `data/screenshots/home.png` — Home screen (1280×720, Continue Watching + Recently Added)
+- ✅ `data/screenshots/sources.png` — Sources & Settings dialog (Appearance tab)
+- ✅ AppStream metainfo `<screenshots>` block added and validates cleanly
+- ✅ Screenshots included in wheel (`data/screenshots/*.png` in `pyproject.toml` package-data)
 
 ## Demo video checklist
 
@@ -122,8 +116,8 @@ If recording:
 
 ## Missing before PR can be opened
 
-- [ ] At least one screenshot in AppStream metainfo
-- [ ] Screenshots stored in `data/screenshots/` and committed
+- ✅ At least one screenshot in AppStream metainfo
+- ✅ Screenshots stored in `data/screenshots/` and committed
 - [ ] Fork https://github.com/flathub/flathub on GitHub
 - [ ] Create branch `new-app/io.github.ycderman.qmediacenter`
 - [ ] Copy `packaging/flatpak/flathub/io.github.ycderman.qmediacenter.yml` to repo root
@@ -153,5 +147,5 @@ AppStream and desktop file validate cleanly.
 - [x] OARS content rating present
 - [x] AppStream releases populated (0.5.0 – 0.7.0)
 - [x] License: MIT
-- [ ] Screenshots added to metainfo
+- [x] Screenshots added to metainfo
 ```

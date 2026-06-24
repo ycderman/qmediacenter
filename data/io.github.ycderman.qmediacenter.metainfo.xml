@@ -28,20 +28,12 @@
 
   <screenshots>
     <screenshot type="default">
-      <caption>Home screen with source-tagged rows</caption>
-      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/home.png</image>
+      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/data/screenshots/home.png</image>
+      <caption>Home screen with Continue Watching and Recently Added rows</caption>
     </screenshot>
     <screenshot>
-      <caption>IPTV — Live TV, Movies and Series</caption>
-      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/iptv.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Detail view with metadata</caption>
-      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/detail.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Local media library</caption>
-      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/docs/img/mymedia.png</image>
+      <image>https://raw.githubusercontent.com/ycderman/qmediacenter/main/data/screenshots/sources.png</image>
+      <caption>Sources and settings dialog with theme selection</caption>
     </screenshot>
   </screenshots>
 

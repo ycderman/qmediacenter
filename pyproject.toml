@@ -61,8 +61,8 @@ py-modules = ["main"]
 [tool.setuptools.package-data]
 # QSS theme files — accessed via importlib.resources at runtime
 "themes" = ["*.qss"]
-# App icon and AppStream metainfo — accessed via importlib.resources at runtime
-"data" = ["*.png", "*.xml", "*.svg"]
+# App icon, AppStream metainfo, and screenshots
+"data" = ["*.png", "*.xml", "*.svg", "screenshots/*.png"]
 # Marker files
 "*" = ["py.typed"]
 

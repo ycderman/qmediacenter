@@ -54,7 +54,7 @@ Quick status:
 6. ✅ `--socket=session-bus` removed (named bus access sufficient for MPRIS2)
 7. ✅ All bundled sources pinned with sha256 — no floating branches
 8. ✅ OARS content rating present in metainfo
-9. [ ] Screenshots added to AppStream metainfo
+9. ✅ Screenshots added to AppStream metainfo
 10. [ ] Fork flathub/flathub and open PR
 
 ### Testing the Flathub manifest
