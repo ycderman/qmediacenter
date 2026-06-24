@@ -1,6 +1,6 @@
 # QMediaCenter — Professionalization Roadmap
 
-> Generated: 2026-06-24 | Updated: 2026-06-24 | Status: Sprint 2 complete
+> Generated: 2026-06-24 | Updated: 2026-06-25 | Status: Sprint 3.5 complete
 
 ---
 
@@ -279,16 +279,30 @@ Nix + Flatpak packaging infrastructure.
 3. ✅ `docs/NIXPKGS.md`, `docs/FLATPAK.md`, packaging READMEs
 4. ✅ README updated with Nix + Flatpak install sections
 
-### Sprint 4 — Proposed
-RPM, AUR and Nixpkgs submission.
+### Sprint 3.5 — Completed 2026-06-25
+Release readiness and quality pass.
 
-1. `packaging/rpm/qmediacenter.spec` — real RPM spec (pyproject-based)
-2. `packaging/arch/PKGBUILD` — AUR package pointing at release tag
-3. Nixpkgs PR: pin `qmediacenter.nix` to release sha256, submit to nixpkgs/master
-4. COPR/OBS initial setup
-5. Flathub PR re-opened with proper checklist + demo video (manual — AI policy)
-6. AppStream `releases` updated for all 0.6.x tags
-7. `CONTRIBUTING.md`
+1. ✅ AppStream `releases` updated: 0.5.0 through 0.7.0 all documented
+2. ✅ AppStream description updated (removed "development packaging" phrasing)
+3. ✅ AppStream validates cleanly: `appstreamcli validate --no-net`
+4. ✅ CHANGELOG [0.7.0] written as proper release notes (user-facing language)
+5. ✅ Nix derivation quality pass: mpv/python-mpv separation documented,
+   `maintainers` expression correct, comments explain non-obvious choices
+6. ✅ Flatpak manifest: `--filesystem=home` not used; minimal permissions documented
+7. ✅ `docs/RELEASE.md` created — full release process from tag to AUR/Nixpkgs/Flathub
+8. ✅ `CONTRIBUTING.md` created — dev setup, test commands, security rules
+9. ✅ README NixOS section corrected (removed `nix-build package.nix` / `qplayer`)
+10. ✅ ROADMAP Sprint 4/5/6 milestones defined
+
+### Sprint 4 — Proposed
+RPM spec, AUR PKGBUILD, and release tag.
+
+1. Cut the first official `v0.7.0` release tag + GitHub Release
+2. `packaging/rpm/qmediacenter.spec` — proper RPM spec (pyproject-based)
+3. `packaging/arch/PKGBUILD` — AUR package pointing at release tag
+4. Nixpkgs derivation: pin to release sha256, add to `nixpkgs/master` PR
+5. Flathub PR re-opened: `type: git` source, proper checklist, demo video (manual)
+6. COPR or OBS initial setup
 
 ### Sprint 5 — Proposed
 Debian packaging.
@@ -297,5 +311,15 @@ Debian packaging.
 2. All runtime deps must exist as Debian packages (check `python-mpv` status)
 3. ITP filed on Debian BTS
 4. pbuilder/sbuild clean network-free build test
+
+### Sprint 6 — Proposed
+Architecture and UI improvements.
+
+1. Split `MainWindow` (1 600+ lines) into page controllers
+2. `sources/` module with shared `Source` interface
+3. DB migration system
+4. `SecretStore` abstraction (KWallet / GNOME Keyring)
+5. Fullscreen overlay with auto-hide controls
+6. 80%+ test coverage
 
 *This document is updated at the end of each sprint.*

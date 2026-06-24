@@ -20,7 +20,7 @@
       <li>Continue Watching — resume positions saved across all sources</li>
       <li>Home screen — rows for Continue Watching, Favourites, Recently Added</li>
       <li>Wayland and X11 support</li>
-      <li>KDE Breeze Light theme with desktop accent colour</li>
+      <li>Breeze Light and Breeze Dark themes, accent colour follows the desktop</li>
     </ul>
   </description>
 
@@ -80,9 +80,39 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
-    <release version="0.5.2" date="2026-06-24">
+    <release version="0.7.0" date="2026-06-25" type="development">
+      <description>
+        <p>Development packaging release: Nix derivation and Flatpak manifest added. Wheel-based install fully functional via pip. Resources (themes, icon) accessible through importlib.resources after wheel install. CLI --version and --help work without a display server.</p>
+      </description>
+    </release>
+    <release version="0.6.7" date="2026-06-24">
+      <description>
+        <p>Fixed blank video output inside Flatpak by setting fbo-format=rgba8, avoiding an OpenGL INVALID_ENUM error with Mesa.</p>
+      </description>
+    </release>
+    <release version="0.6.5" date="2026-06-24">
+      <description>
+        <p>Fixed codec detection on HLS streams by removing the mpv fast profile that zeroed analyzeduration.</p>
+      </description>
+    </release>
+    <release version="0.6.3" date="2026-06-23">
+      <description>
+        <p>Faster channel switching: live stream buffer reduced from 200 MiB to 4 MiB.</p>
+      </description>
+    </release>
+    <release version="0.6.0" date="2026-06-23">
+      <description>
+        <p>Added M3U/M3U8 playlist support alongside Xtream Codes. App now starts directly to the home screen without a login dialog.</p>
+      </description>
+    </release>
+    <release version="0.5.2" date="2026-06-21">
       <description>
         <p>Disk-cached IPTV stream list, scroll pagination for recently added, background auto-refresh.</p>
+      </description>
+    </release>
+    <release version="0.5.0" date="2026-06-20">
+      <description>
+        <p>Initial Flatpak support. MPRIS2 media player integration. Home screen with Continue Watching, Favourites, Recently Added and Movies rows.</p>
       </description>
     </release>
   </releases>

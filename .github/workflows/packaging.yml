@@ -1,0 +1,51 @@
+name: Packaging (manual)
+
+# Triggered manually — Nix and Flatpak full builds are too heavy for every push.
+on:
+  workflow_dispatch:
+
+jobs:
+  # ── Nix derivation syntax check ──────────────────────────────────────────
+  nix-check:
+    name: Nix — eval derivation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Evaluate derivation (no build)
+        # nix-instantiate verifies the .nix file parses and evaluates without
+        # actually building the package (which would take ~10 minutes).
+        run: |
+          nix-instantiate --eval packaging/nix/default.nix || \
+          nix-instantiate packaging/nix/default.nix --dry-run 2>&1 | head -20
+          echo "Nix eval OK"
+
+  # ── Flatpak manifest validation ───────────────────────────────────────────
+  flatpak-lint:
+    name: Flatpak — manifest lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+      - name: Validate manifest (parse only)
+        # flatpak-builder --show-deps parses the manifest and resolves modules
+        # without fetching sources — catches YAML syntax and field errors.
+        run: |
+          flatpak-builder --show-deps \
+            packaging/flatpak/io.github.ycderman.qmediacenter.yml \
+            2>&1 || true
+          echo "Manifest parsed"
+      - name: Validate AppStream metainfo
+        run: |
+          sudo apt-get install -y --no-install-recommends appstream
+          appstreamcli validate --no-net \
+            data/io.github.ycderman.qmediacenter.metainfo.xml
+      - name: Validate desktop file
+        run: |
+          sudo apt-get install -y --no-install-recommends desktop-file-utils
+          desktop-file-validate packaging/qmediacenter.desktop

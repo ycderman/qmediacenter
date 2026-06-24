@@ -8,13 +8,33 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.7.0] — 2026-06-25
+
 ### Added
-- `pyproject.toml` — standard Python packaging, `pip install .` support
-- `ThemeManager` with Breeze Light and Breeze Dark themes
-- `themes/breeze-light.qss` and `themes/breeze-dark.qss` with `@ACCENT@` placeholder
-- `tests/` directory with pytest-based test suite (library_db, m3u, themes, packaging metadata)
-- `docs/ROADMAP_PROFESSIONALIZATION.md` — architecture analysis and distro packaging roadmap
-- PyInstaller spec moved to `packaging/pyinstaller/qmediacenter.spec`
+- Nix development packaging (`packaging/nix/`) — `buildPythonApplication` derivation;
+  installs `.desktop`, metainfo, and icon; Wayland plugin path wired via `wrapQtAppsHook`
+- Flatpak development manifest (`packaging/flatpak/`) — builds via pip install so
+  `importlib.resources` and `dist-info` entry points work correctly inside the sandbox;
+  uses `io.qt.PySide.BaseApp//6.8` + `org.kde.Platform//6.8`
+- Installable Python package (`pyproject.toml`) — `pip install .`, `pip install -e .`,
+  `pipx install`, and wheel install all work
+- Breeze Dark theme alongside Breeze Light; theme switcher in Sources → Appearance
+- `tests/` directory with pytest suite (63 tests covering library DB, M3U parser,
+  themes, packaging metadata, and resource access)
+- `--version` and `--help` CLI flags that work without a display server
+- CI: pytest job, wheel build + smoke test job, `qmediacenter --version` verified in CI
+
+### Fixed
+- Icon loaded from package bytes (`QPixmap.loadFromData`) instead of a context-manager
+  temp file — eliminates a race condition when resources are inside a zip importer
+- Theme QSS files and app icon now accessible via `importlib.resources` after wheel
+  install (no longer path-relative only)
+
+### Changed
+- AppStream `releases` updated to cover 0.5.0 through 0.7.0
+- PyInstaller spec moved to `packaging/pyinstaller/`
 
 ---
 
@@ -94,7 +114,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Source badges on home screen items
 - Alphabetical sorting for movies and series
 
-[Unreleased]: https://github.com/ycderman/qmediacenter/compare/v0.6.7...HEAD
+[Unreleased]: https://github.com/ycderman/qmediacenter/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ycderman/qmediacenter/compare/v0.6.7...v0.7.0
 [0.6.7]: https://github.com/ycderman/qmediacenter/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/ycderman/qmediacenter/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/ycderman/qmediacenter/compare/v0.6.4...v0.6.5

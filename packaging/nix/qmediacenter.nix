@@ -3,8 +3,11 @@
 , fetchFromGitHub
 , qt6
 , libGL
+# pkgs.mpv — provides libmpv.so; distinct from python3Packages.mpv below.
 , mpv
-# Set src = ./. when using from the repo root; fetchFromGitHub for a pinned release.
+# Override src/version when calling from default.nix or a flake.
+# When src is null the derivation falls back to fetchFromGitHub with a
+# placeholder sha256 — replace rev/sha256 before using for a real release.
 , src ? null
 , version ? "git"
 }:
@@ -13,21 +16,25 @@ python3.pkgs.buildPythonApplication {
   pname = "qmediacenter";
   inherit version;
 
-  src = if src != null then src else (fetchFromGitHub {
-    owner = "ycderman";
-    repo  = "qmediacenter";
-    # Replace with current commit hash when pinning a release:
+  src = if src != null then src else fetchFromGitHub {
+    owner  = "ycderman";
+    repo   = "qmediacenter";
+    # Pin to a release tag before submitting to nixpkgs:
     rev    = "HEAD";
     sha256 = lib.fakeSha256;
-  });
+  };
 
   format = "pyproject";
 
   nativeBuildInputs = with python3.pkgs; [
     setuptools
     setuptools-scm
+    # wrapQtAppsHook sets QT_PLUGIN_PATH / QT_QPA_PLATFORM_PLUGIN_PATH so
+    # PySide6's bundled platform plugins (wayland, xcb) are found at runtime.
   ] ++ [ qt6.wrapQtAppsHook ];
 
+  # python3Packages.mpv is the pure-Python ctypes binding (python-mpv on PyPI).
+  # It is distinct from the pkgs.mpv argument above which provides libmpv.so.
   propagatedBuildInputs = with python3.pkgs; [
     pyside6
     mpv
@@ -36,26 +43,25 @@ python3.pkgs.buildPythonApplication {
     yt-dlp
   ];
 
+  # libGL: OpenGL for the mpv OpenGL render API.
+  # pkgs.mpv: libmpv.so loaded at runtime by the python-mpv ctypes binding.
+  # qt6.qtwayland: Wayland platform plugin for Qt.
   buildInputs = [
     libGL
-    mpv          # libmpv.so at runtime for the ctypes binding
+    mpv
     qt6.qtwayland
   ];
 
-  # setuptools-scm cannot detect the version from a Nix store path (no .git).
+  # setuptools-scm cannot determine the version from a Nix store path (no .git).
   SETUPTOOLS_SCM_PRETEND_VERSION = version;
 
-  # pythonRuntimeDepsCheckHook compares Requires-Dist names from the wheel
-  # against installed dist-info names.  python3Packages.mpv ships as pname
-  # "mpv" but the hook can't resolve it against Requires-Dist: mpv>=1.0
-  # (PyPA normalisation mismatch).  The Nix closure already enforces all
-  # runtime deps are present, so skipping this check is safe.
+  # pythonRuntimeDepsCheckHook verifies Requires-Dist entries against installed
+  # dist-info names.  python3Packages.mpv (pname = "mpv") is not resolved
+  # against "Requires-Dist: mpv>=1.0" due to a PyPA normalisation edge case.
+  # Disabling is safe: the Nix closure already enforces all runtime deps.
   dontCheckRuntimeDeps = true;
 
-  # Qt needs to find the platform plugin; wrap the binary so QT_PLUGIN_PATH
-  # and QT_QPA_PLATFORM_PLUGIN_PATH include the PySide6 plugin tree.
   postInstall = ''
-    # Desktop integration files
     install -Dm644 packaging/qmediacenter.desktop \
       $out/share/applications/io.github.ycderman.qmediacenter.desktop
     install -Dm644 data/io.github.ycderman.qmediacenter.metainfo.xml \
@@ -63,12 +69,12 @@ python3.pkgs.buildPythonApplication {
     install -Dm644 data/qmediacenter.png \
       $out/share/icons/hicolor/256x256/apps/io.github.ycderman.qmediacenter.png
 
-    # wrapQtAppsHook handles QT_PLUGIN_PATH / QT_QPA_PLATFORM_PLUGIN_PATH.
-    # Add libmpv to LD_LIBRARY_PATH so the python-mpv ctypes binding finds it.
+    # Add libmpv to LD_LIBRARY_PATH so the python-mpv ctypes binding resolves
+    # libmpv.so.  wrapQtAppsHook applies this during the fixup phase.
     qtWrapperArgs+=(--prefix LD_LIBRARY_PATH : "${mpv}/lib")
   '';
 
-  # Tests require a live display or offscreen platform; skip during build.
+  # Tests require a connected display (or QT_QPA_PLATFORM=offscreen + libmpv).
   doCheck = false;
 
   meta = with lib; {
@@ -77,6 +83,6 @@ python3.pkgs.buildPythonApplication {
     license     = licenses.mit;
     platforms   = platforms.linux;
     mainProgram = "qmediacenter";
-    maintainers = [ maintainers.ycderman or {} ];
+    maintainers = with maintainers; [ (ycderman or lib.systems.inspect.ycderman or lib.id {}) ];
   };
 }

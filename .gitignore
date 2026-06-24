@@ -1,13 +1,12 @@
 __pycache__/
 *.pyc
-result
+.pytest_cache/
+.ruff_cache/
 build/
 dist/
 *.egg-info/
-qmediacenter_version.py
-.pytest_cache/
-.ruff_cache/
 *.whl
 *.tar.gz
-.flatpak-builder/
 result
+.flatpak-builder/
+qmediacenter_version.py
