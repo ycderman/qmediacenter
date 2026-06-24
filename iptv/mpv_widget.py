@@ -43,6 +43,7 @@ class MpvWidget(QOpenGLWidget):
             cache_pause=False,
             user_agent="QtIPTV/0.1",
             vd_lavc_fast=True,
+            fbo_format="rgba8",
             log_handler=self._mpv_log,
             loglevel="warn",
         )
