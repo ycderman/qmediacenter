@@ -3,8 +3,11 @@
 Implements the same live-stream interface as XtreamClient so
 main_window.py can treat M3U and Xtream profiles identically.
 """
+import logging
 import re
 import urllib.request
+
+log = logging.getLogger(__name__)
 
 
 _EXTINF = re.compile(r'#EXTINF:[^,]*,?(.*)')
@@ -60,17 +63,24 @@ class M3uClient:
 
     def _ensure(self):
         if self._channels is None:
+            log.info("M3U: fetching %s", self.url)
             self._channels = parse(self.url)
+            log.info("M3U: loaded %d channels", len(self._channels))
 
     def authenticate(self) -> bool:
         try:
             self._ensure()
             return True
-        except Exception:
+        except Exception as e:
+            log.error("M3U: authenticate failed: %s", e)
             return False
 
     def live_categories(self) -> list[dict]:
-        self._ensure()
+        try:
+            self._ensure()
+        except Exception as e:
+            log.error("M3U live_categories failed: %s", e)
+            return []
         seen = {}
         for ch in self._channels:
             g = ch.get("group") or "Uncategorized"
