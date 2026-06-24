@@ -36,11 +36,9 @@ class TestThemeManager:
 
     def test_apply_unknown_theme_falls_back(self):
         """Applying unknown theme_id must not raise — falls back to default."""
-        # No QApplication in unit tests, so apply() will log an error and return False.
-        # Just verify it doesn't raise.
         tm = ThemeManager()
-        result = tm.apply("nonexistent-theme-xyz")
-        assert result is False  # no QApplication
+        # Must not raise; return value depends on whether a QApplication is running.
+        tm.apply("nonexistent-theme-xyz")
 
     def test_get_manager_singleton(self):
         m1 = get_manager()

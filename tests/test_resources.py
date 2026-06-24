@@ -1,10 +1,6 @@
-"""Tests for runtime resource access via importlib.resources.
-
-These tests verify that theme QSS files, the app icon, and AppStream
-metainfo are accessible through the package data mechanism — meaning they
-will work after both editable and wheel installs.
-"""
+"""Tests for runtime resource access via importlib.resources."""
 import importlib.resources
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -39,33 +35,72 @@ class TestThemeResources:
         assert _read_qss("nonexistent-theme.qss") is None
 
     def test_theme_manager_fallback_on_unknown_id(self):
-        """apply() with unknown theme_id falls back to default and returns False
-        (no QApplication), not raises."""
+        """apply() with unknown theme_id falls back gracefully without raising."""
         from ui.theme_manager import ThemeManager
         tm = ThemeManager()
-        result = tm.apply("does-not-exist")
-        assert result is False
+        # Must not raise; return value depends on whether QApplication is running
+        tm.apply("does-not-exist")
 
 
 class TestIconResource:
+    def test_icon_bytes_readable(self):
+        """PNG bytes must be readable directly — no temp file involved."""
+        ref = importlib.resources.files("data").joinpath("qmediacenter.png")
+        png_bytes = ref.read_bytes()
+        assert png_bytes[:4] == b"\x89PNG", "qmediacenter.png is not a valid PNG"
+        assert len(png_bytes) > 1000, "PNG file suspiciously small"
+
     def test_icon_accessible_via_data_package(self):
         ref = importlib.resources.files("data").joinpath("qmediacenter.png")
         assert ref.is_file(), "qmediacenter.png not found in data package"
 
-    def test_icon_is_png(self):
-        ref = importlib.resources.files("data").joinpath("qmediacenter.png")
-        with importlib.resources.as_file(ref) as p:
-            header = p.read_bytes()[:8]
-        # PNG magic bytes
-        assert header[:4] == b"\x89PNG", "qmediacenter.png is not a valid PNG"
-
-    def test_icon_path_resolver(self):
-        """_icon_pixmap_path() must return a non-None path in source/editable install."""
+    def test_app_icon_with_qapplication(self, qtbot):
+        """_app_icon() returns a non-null QIcon when a QApplication is running."""
         import main as m
-        path = m._icon_pixmap_path()
-        assert path is not None, "_icon_pixmap_path() returned None in source install"
-        from pathlib import Path
-        assert Path(path).exists(), f"Icon path does not exist: {path}"
+        icon = m._app_icon()
+        from PySide6.QtGui import QIcon
+        assert isinstance(icon, QIcon)
+        assert not icon.isNull()
+
+    def test_app_icon_resource_unavailable_uses_fallback(self, qtbot):
+        """When importlib.resources raises, _app_icon() falls back to the
+        repo-relative path without crashing."""
+        import main as m
+        from PySide6.QtGui import QIcon
+
+        # Patch importlib.resources.files inside the main module so read_bytes raises
+        bad_ref = MagicMock()
+        bad_ref.read_bytes.side_effect = FileNotFoundError("simulated missing resource")
+        bad_pkg = MagicMock()
+        bad_pkg.joinpath.return_value = bad_ref
+
+        with patch("main.importlib.resources.files", return_value=bad_pkg):
+            icon = m._app_icon()
+            assert isinstance(icon, QIcon)
+            # The repo-relative data/qmediacenter.png exists, so icon must not be null
+            assert not icon.isNull()
+
+    def test_app_icon_theme_fallback_no_crash(self, qtbot):
+        """When both resource and file-system paths are unavailable,
+        _app_icon() must return fromTheme without crashing."""
+        import main as m
+        from PySide6.QtGui import QIcon, QPixmap
+
+        bad_bytes = b"not a png"
+
+        def _bad_load(data, fmt=None):
+            return False
+
+        # Simulate importlib returning bad bytes and no on-disk file
+        with patch("importlib.resources.files") as mock_files:
+            mock_ref = MagicMock()
+            mock_ref.read_bytes.return_value = bad_bytes
+            mock_files.return_value.joinpath.return_value = mock_ref
+
+            with patch("os.path.exists", return_value=False):
+                with patch.object(QPixmap, "loadFromData", return_value=False):
+                    icon = m._app_icon()
+                    assert isinstance(icon, QIcon)
 
 
 class TestMetainfoResource:
@@ -90,10 +125,7 @@ class TestVersionCLI:
         assert isinstance(v, str)
         assert len(v) > 0
 
-    def test_version_format_after_install(self):
-        """After wheel install, version should not be the dev fallback."""
+    def test_version_non_empty(self):
         import main as m
         v = m._get_version()
-        # In source/editable mode this may be 0.0.0+dev; that's acceptable here.
-        # What matters is it doesn't crash.
         assert v is not None
