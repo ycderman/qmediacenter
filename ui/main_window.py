@@ -775,11 +775,22 @@ class MainWindow(QMainWindow):
 
     _STREAM_CACHE_TTL = 2 * 3600  # 2 hours
 
+    @staticmethod
+    def _sort_recent(items):
+        def _ts(d):
+            try:
+                return int(d.get("added") or d.get("last_modified") or 0)
+            except (ValueError, TypeError):
+                return 0
+        return sorted(items, key=_ts, reverse=True)[:1000]
+
     def _prefetch_streams(self, mode):
         fetch = self.client.vod_streams if mode == "vod" else self.client.series
         def _store(items, m=mode):
             if not isinstance(items, Exception) and items:
+                self.db.cache_put(f"xtream_{m}_recent", self._sort_recent(items))
                 self.db.cache_put(f"xtream_{m}_streams", items)
+                del items
         self._run(fetch, _store)
 
     # ---- name search (live/vod/series) -----------------------------------
@@ -811,7 +822,9 @@ class MainWindow(QMainWindow):
         if isinstance(items, Exception) or not items:
             items = []
         self._search_buf = {self.mode: items}
-        self.db.cache_put(f"xtream_{self.mode}_streams", items)
+        if items:
+            self.db.cache_put(f"xtream_{self.mode}_recent", self._sort_recent(items))
+            self.db.cache_put(f"xtream_{self.mode}_streams", items)
         q = self.cat_search.text().strip()
         if q:
             self._apply_search(items, q)
@@ -847,28 +860,27 @@ class MainWindow(QMainWindow):
         self._run(fn, self._populate_content)
 
     def _load_recently_added(self):
-        disk = self.db.cache_get(f"xtream_{self.mode}_streams", max_age=self._STREAM_CACHE_TTL)
-        if disk:
-            self._show_recently_added(disk)
+        recent = self.db.cache_get(f"xtream_{self.mode}_recent", max_age=self._STREAM_CACHE_TTL)
+        if recent:
+            self._show_recently_added(recent)
             return
         fetch = (self.client.vod_streams if self.mode == "vod" else self.client.series)
         def _fetched(items):
             if not isinstance(items, Exception) and items:
+                recent = self._sort_recent(items)
+                self.db.cache_put(f"xtream_{self.mode}_recent", recent)
                 self.db.cache_put(f"xtream_{self.mode}_streams", items)
-            self._show_recently_added(items)
+                del items
+                self._show_recently_added(recent)
+            else:
+                self._show_recently_added(items)
         self._run(fetch, _fetched)
 
     def _show_recently_added(self, items):
         if isinstance(items, Exception) or not items:
             self._populate_content(items)
             return
-        def _added_ts(d):
-            v = d.get("added") or d.get("last_modified") or "0"
-            try:
-                return int(v)
-            except (ValueError, TypeError):
-                return 0
-        self._recent_items = sorted(items, key=_added_ts, reverse=True)[:1000]
+        self._recent_items = items[:1000]
         self._recent_offset = 0
         self.content_list.clear()
         self.content_header.setText(f"{len(self._recent_items)} items")
