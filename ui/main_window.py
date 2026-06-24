@@ -438,6 +438,7 @@ class MainWindow(QMainWindow):
         if active is None:
             self._show_iptv_empty()
             return
+        self._apply_iptv_profile(active)
         if self.mode not in ("live", "vod", "series"):
             self.mode = "live"
         self._set_mode(self.mode)
@@ -458,11 +459,7 @@ class MainWindow(QMainWindow):
                 break
         self.iptv_profile_combo.blockSignals(False)
 
-    def _on_iptv_profile_changed(self, _idx):
-        active = self.iptv_profile_combo.currentData()
-        if active is None:
-            self._show_iptv_empty()
-            return
+    def _apply_iptv_profile(self, active):
         kind, p = active
         if kind == "m3u":
             self.client = M3uClient(p["name"], p["url"])
@@ -470,6 +467,13 @@ class MainWindow(QMainWindow):
             from iptv.xtream import XtreamClient
             self.client = XtreamClient(p["host"], p["username"], p["password"])
             self.profile = p
+
+    def _on_iptv_profile_changed(self, _idx):
+        active = self.iptv_profile_combo.currentData()
+        if active is None:
+            self._show_iptv_empty()
+            return
+        self._apply_iptv_profile(active)
         self.mode = "live"
         self._set_mode("live")
 
