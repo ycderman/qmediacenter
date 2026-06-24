@@ -65,9 +65,23 @@ present, so skipping this check is safe.
 
 ## Pinning to a release tag
 
-See `packaging/nix/release-example.nix` for a ready-to-use template.
+**Requires: the release tag must be pushed to GitHub first** — `nix-prefetch-url`
+and `fetchFromGitHub` fetch from the remote tarball, which only exists after push.
 
-Get the hash after tagging:
+See `packaging/nix/release-example.nix` for a ready-to-use template.
+Its `lib.fakeHash` placeholder must be replaced with the real hash before any
+Nixpkgs PR submission.
+
+The easiest workflow is to build once with `lib.fakeHash` and let Nix tell you
+the correct hash:
+
+```bash
+nix-build packaging/nix/release-example.nix
+# Build fails with: got: sha256-AAAA...
+# Paste that value as hash = "sha256-AAAA..."; in release-example.nix, then rebuild.
+```
+
+Or prefetch directly (tag must be on remote):
 
 ```bash
 nix-prefetch-url --unpack \
@@ -81,18 +95,17 @@ nix flake prefetch github:ycderman/qmediacenter/v0.7.0
 # The hash appears as narHash in the output
 ```
 
-Build from the pinned derivation:
+After updating the hash, verify the pinned build works:
 
 ```bash
 nix-build packaging/nix/release-example.nix
-# First run will fail with the correct hash — copy it, update release-example.nix, rebuild
 ./result/bin/qmediacenter --version
 ```
 
-## Nixpkgs submission (Sprint 4)
+## Nixpkgs submission
 
 Before submitting to nixpkgs:
-- Pin `src` to a tagged release with a real `sha256` (replace `lib.fakeHash`)
+- Tag pushed to remote and `lib.fakeHash` replaced with the real hash
 - Set `version` to the release tag (e.g. `"0.7.0"`)
 - Add yourself to `maintainers/maintainer-list.nix` in the nixpkgs repo, then
   add to the derivation: `maintainers = with maintainers; [ ycderman ];`

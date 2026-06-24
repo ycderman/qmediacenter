@@ -39,9 +39,12 @@ with a pinned tag and commit. Before re-opening the Flathub PR:
    git push origin v0.7.0
    ```
 
-2. Get the exact commit hash for the tag:
+2. Get the exact commit hash that the tag points to:
    ```bash
-   git rev-parse refs/tags/v0.7.0
+   # For annotated tags, rev-parse on the ref returns the tag object hash,
+   # not the commit hash. Dereference with ^{} or use rev-list:
+   git rev-list -n 1 v0.7.0
+   # Equivalent: git rev-parse v0.7.0^{}
    ```
 
 3. Update `.flathub.yml`:

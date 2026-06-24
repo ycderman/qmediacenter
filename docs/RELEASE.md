@@ -49,7 +49,9 @@ LC_ALL=C LANG=C nix-shell -p appstream --run \
 git add CHANGELOG.md data/io.github.ycderman.qmediacenter.metainfo.xml
 git commit -m "release: X.Y.Z"
 git tag -a "vX.Y.Z" -m "QMediaCenter X.Y.Z"
-git push origin main --tags
+# Push main first so the tag points to a commit already on remote
+git push origin main
+git push origin vX.Y.Z
 ```
 
 ## 4. GitHub Release
@@ -59,70 +61,96 @@ Create a GitHub Release from the tag and attach the CI artifacts.
 
 ## 5. Update Nix derivation for release
 
-In `packaging/nix/qmediacenter.nix`, replace the placeholder `src`:
+**Requires: tag already pushed to remote** (GitHub tarball must exist).
 
-```nix
-src = fetchFromGitHub {
-  owner  = "ycderman";
-  repo   = "qmediacenter";
-  rev    = "vX.Y.Z";
-  sha256 = lib.fakeHash;  # build once, copy the correct hash from error output
-};
-```
-
-Then build to get the real hash:
+Use `packaging/nix/release-example.nix` as a template. The `lib.fakeHash`
+placeholder triggers a build failure that prints the real hash:
 
 ```bash
-nix-build packaging/nix/qmediacenter.nix   # will fail with the real sha256
-# Copy the sha256 from the error, update the file, build again
+# Build once with fakeHash — it will fail and print the correct hash
+nix-build packaging/nix/release-example.nix
+# Error output contains something like:
+#   got:    sha256-AAAA...
+# Paste that hash into release-example.nix, then:
+nix-build packaging/nix/release-example.nix  # should succeed now
+./result/bin/qmediacenter --version
+
+# Alternative: prefetch directly (requires tag on remote)
+nix-prefetch-url --unpack \
+  https://github.com/ycderman/qmediacenter/archive/refs/tags/vX.Y.Z.tar.gz
 ```
 
 ## 6. Update Flatpak manifest for release
 
-In `packaging/flatpak/io.github.ycderman.qmediacenter.yml`, replace the
-`type: dir` source with:
+**Requires: tag already pushed to remote.**
 
-```yaml
-    sources:
-      - type: git
-        url: https://github.com/ycderman/qmediacenter
-        tag: vX.Y.Z
-        commit: <output of git rev-parse HEAD>
+`packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml` already uses
+`type: git`. After pushing the tag, fill in the commit hash:
+
+```bash
+# For annotated tags: rev-parse on the ref returns the tag object, not the commit.
+# Use rev-list or the ^{} dereference operator instead:
+git rev-list -n 1 vX.Y.Z
+# Equivalent: git rev-parse vX.Y.Z^{}
 ```
 
-Also bump `SETUPTOOLS_SCM_PRETEND_VERSION` to match the tag.
+Update `commit:` in `.flathub.yml` with the output.
+Also confirm `SETUPTOOLS_SCM_PRETEND_VERSION` matches the tag version.
 
-Test with flatpak-builder before publishing.
+Test the release manifest before submitting:
+
+```bash
+flatpak-builder --force-clean /tmp/qmc-flathub-build \
+  packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml
+flatpak-builder --run /tmp/qmc-flathub-build \
+  packaging/flatpak/io.github.ycderman.qmediacenter.flathub.yml qmediacenter --version
+```
 
 ## 7. Flathub PR
 
 Before re-opening the Flathub PR:
-- Switch source to `type: git` with the release tag and commit hash
+- `commit:` field in `.flathub.yml` contains the real hash (not PLACEHOLDER)
 - Fill in the Flathub submission checklist
 - Record a short screen capture (IPTV channel loading, local library browse)
 - Note AI policy: all bundled code must be reviewed; generated code is acceptable
   if reviewed and understood
 
-## 8. AUR PKGBUILD (Sprint 4)
+## 8. AUR PKGBUILD
+
+**Requires: tag already pushed to remote** (GitHub tarball must exist).
+
+Get the sha256sum from the GitHub tarball:
+
+```bash
+curl -L https://github.com/ycderman/qmediacenter/archive/refs/tags/vX.Y.Z.tar.gz \
+  | sha256sum
+# or: makepkg -g (from inside packaging/arch/ on an Arch system)
+```
 
 Update `packaging/arch/PKGBUILD`:
-```
-pkgver=X.Y.Z
-source=("$pkgname-$pkgver.tar.gz::https://github.com/ycderman/qmediacenter/archive/vX.Y.Z.tar.gz")
-sha256sums=('...')
-```
+- Replace `sha256sums=('SKIP')` with the real hash
+- **Never push to AUR with SKIP**
 
-Run `makepkg -si` in a clean Arch environment, then push to AUR:
+Generate `.SRCINFO` and push:
+
 ```bash
-ssh aur@aur.archlinux.org qmediacenter.git
+cd packaging/arch
+makepkg --printsrcinfo > .SRCINFO
+git clone ssh://aur@aur.archlinux.org/qmediacenter.git aur-qmediacenter
+cp PKGBUILD .SRCINFO aur-qmediacenter/
+cd aur-qmediacenter && git add -A && git commit -m "Initial release X.Y.Z"
+git push
 ```
 
-## 9. Nixpkgs PR (Sprint 4)
+## 9. Nixpkgs PR
+
+**Requires: tag on remote and real hash in `release-example.nix`.**
 
 After adding `ycderman` to `nixpkgs/maintainers/maintainer-list.nix`:
-- Submit `pkgs/applications/video/qmediacenter/default.nix`
-- Point to the sdist on PyPI or tarball on GitHub releases
+- Copy `packaging/nix/qmediacenter.nix` to `pkgs/applications/video/qmediacenter/default.nix`
+- Update `fetchFromGitHub` with real rev + hash (from step 5)
 - Run `nix-build -A python3Packages.qmediacenter` against nixpkgs checkout
+- Open PR against `nixpkgs/master`
 
 ## Version numbering
 

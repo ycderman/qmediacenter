@@ -192,6 +192,8 @@ modules:
       - type: git
         url: https://github.com/ycderman/qmediacenter
         tag: v0.7.0
-        # Placeholder — replace with: git rev-parse refs/tags/v0.7.0
-        # after the tag is pushed.
+        # Replace with the commit the tag points to after pushing:
+        #   git rev-list -n 1 v0.7.0
+        # (Do NOT use "git rev-parse refs/tags/v0.7.0" for annotated tags —
+        # that returns the tag object hash, not the commit hash.)
         commit: PLACEHOLDER_REPLACE_WITH_REAL_COMMIT_AFTER_TAGGING
