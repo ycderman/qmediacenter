@@ -73,10 +73,7 @@ class MpvWidget(QOpenGLWidget):
             self._render_ctx = mpv.MpvRenderContext(
                 self._mpv,
                 "opengl",
-                opengl_init_params={
-                    "get_proc_address": self._proc_addr_cb,
-                    "es2": True,
-                },
+                opengl_init_params={"get_proc_address": self._proc_addr_cb},
             )
             self._render_ctx.update_cb = lambda: self._alive and self._frame_ready.emit()
         except Exception as e:
