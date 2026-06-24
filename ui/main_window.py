@@ -16,7 +16,7 @@ from iptv.m3u import M3uClient
 from iptv.mpv_widget import MpvWidget
 from iptv.downloader import DownloadManager
 from iptv.image_loader import ImageLoader
-from ui.style import build_qss, desktop_accent
+from ui.style import build_qss as _build_qss_legacy  # kept for any future direct callers
 from ui.sources_dialog import SourcesDialog
 from media.library_db import LibraryDB
 from media.metadata import MetadataProvider
@@ -149,8 +149,10 @@ class MainWindow(QMainWindow):
         self.scanner = LibraryScanner(self.db, self.meta)
         self._scanning = False
 
-        self.accent = desktop_accent()
-        self.setStyleSheet(build_qss(self.accent))
+        # Theme is applied by main.py before the window is created.
+        # Store accent for any inline style overrides that still need it.
+        from ui.theme_manager import get_manager as _get_tm
+        self.accent = _get_tm().current_accent()
         self.setWindowTitle(f"QMediaCenter — {profile['name']}" if profile else "QMediaCenter")
         self.resize(1320, 820)
         self._build_ui()

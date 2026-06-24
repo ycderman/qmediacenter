@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 from iptv import config
 from iptv.xtream import XtreamClient
 from ui.main_window import MainWindow
+from ui.theme_manager import get_manager as get_theme_manager
 from media.mpris import MprisAdapter, ScreenInhibitor
 
 
@@ -60,6 +61,11 @@ def main():
             break
     # Qt resets LC_NUMERIC from the environment; libmpv requires "C".
     locale.setlocale(locale.LC_NUMERIC, "C")
+
+    # Apply theme before any window is created so the stylesheet is ready.
+    _settings = config.load_settings()
+    _theme_id = _settings.get("theme", "breeze-light")
+    get_theme_manager().apply(_theme_id)
 
     profile, client = _auto_profile()
 

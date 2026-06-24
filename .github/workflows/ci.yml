@@ -127,7 +127,7 @@ jobs:
   bundle:
     name: PyInstaller bundle
     runs-on: ubuntu-22.04
-    needs: [test, lint, validate-metadata]
+    needs: [test, pytest, lint, validate-metadata]
     if: >
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.ref, 'refs/tags/v') ||

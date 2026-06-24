@@ -10,13 +10,14 @@ Closing with "Save & Scan" tells the caller to (re)scan the local library.
 from PySide6.QtWidgets import (
     QDialog, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QListWidget, QLabel, QFileDialog, QInputDialog,
-    QDialogButtonBox, QMessageBox,
+    QDialogButtonBox, QMessageBox, QComboBox,
 )
 from PySide6.QtCore import Qt
 
 from iptv import config
 from ui.login_dialog import LoginDialog
 from iptv.m3u import M3uClient
+from ui.theme_manager import get_manager as get_theme_manager, THEMES
 
 
 class SourcesDialog(QDialog):
@@ -34,6 +35,7 @@ class SourcesDialog(QDialog):
         self.tabs.addTab(self._m3u_tab(), "📋  M3U Playlist")
         self.tabs.addTab(self._servers_tab(), "🖥  Emby / Plex")
         self.tabs.addTab(self._metadata_tab(), "⭐  Metadata")
+        self.tabs.addTab(self._appearance_tab(), "🎨  Appearance")
         root.addWidget(self.tabs, 1)
 
         bb = QDialogButtonBox()
@@ -228,6 +230,35 @@ class SourcesDialog(QDialog):
         v.addWidget(note)
         v.addStretch()
         return w
+
+    # ---- Appearance ---------------------------------------------------
+    def _appearance_tab(self):
+        w = QWidget(); v = QVBoxLayout(w)
+        v.addWidget(QLabel("Application theme:"))
+
+        self.theme_combo = QComboBox()
+        current = config.load_settings().get("theme", "breeze-light")
+        for meta in THEMES.values():
+            self.theme_combo.addItem(meta["name"], userData=meta["id"])
+            if meta["id"] == current:
+                self.theme_combo.setCurrentIndex(self.theme_combo.count() - 1)
+
+        self.theme_combo.currentIndexChanged.connect(self._on_theme_changed)
+        v.addWidget(self.theme_combo)
+
+        hint = QLabel("Theme is applied immediately without restarting.")
+        hint.setObjectName("Meta"); hint.setWordWrap(True)
+        v.addWidget(hint)
+        v.addStretch()
+        return w
+
+    def _on_theme_changed(self, _idx):
+        theme_id = self.theme_combo.currentData()
+        if theme_id:
+            get_theme_manager().apply(theme_id)
+            s = config.load_settings()
+            s["theme"] = theme_id
+            config.save_settings(s)
 
     # ---- save ---------------------------------------------------------
     def _collect(self):
