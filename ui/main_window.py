@@ -756,6 +756,10 @@ class MainWindow(QMainWindow):
         self.cat_list.clear()
         if isinstance(cats, Exception) or not cats:
             self.content_header.setText("No categories"); return
+        if self.mode in ("vod", "series"):
+            recent_it = QListWidgetItem("🆕  Son Eklenenler")
+            recent_it.setData(ROLE, "__recent__")
+            self.cat_list.addItem(recent_it)
         for c in cats:
             it = QListWidgetItem(c.get("category_name", "?"))
             it.setData(ROLE, c.get("category_id"))
@@ -809,10 +813,54 @@ class MainWindow(QMainWindow):
         self.content_header.setText("Loading…")
         self.pages.setCurrentWidget(self.center)
         cid = self.category_id
+        if cid == "__recent__":
+            self._load_recently_added()
+            return
         fn = {"live": lambda: self.client.live_streams(cid),
               "vod": lambda: self.client.vod_streams(cid),
               "series": lambda: self.client.series(cid)}[self.mode]
         self._run(fn, self._populate_content)
+
+    def _load_recently_added(self):
+        cached = self._all_streams.get(self.mode)
+        if cached is not None:
+            self._show_recently_added(cached)
+            return
+        fetch = (self.client.vod_streams if self.mode == "vod" else self.client.series)
+        def _fetched(items):
+            if not isinstance(items, Exception) and items:
+                self._all_streams[self.mode] = items
+            self._show_recently_added(items)
+        self._run(fetch, _fetched)
+
+    def _show_recently_added(self, items):
+        if isinstance(items, Exception) or not items:
+            self._populate_content(items)
+            return
+        def _added_ts(d):
+            v = d.get("added") or d.get("last_modified") or "0"
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return 0
+        recent = sorted(items, key=_added_ts, reverse=True)[:50]
+        self._populate_content_sorted(recent)
+
+    def _populate_content_sorted(self, items):
+        """Like _populate_content but skips alphabetical re-sort."""
+        self.content_list.clear()
+        if not items:
+            self.content_header.setText("Empty"); return
+        self.content_header.setText(f"{len(items)} items")
+        for d in items:
+            name = d.get("name") or d.get("title") or "?"
+            it = QListWidgetItem(name)
+            it.setData(ROLE, d)
+            it.setSizeHint(QSize(POSTER.width() + 24, POSTER.height() + 52))
+            it.setTextAlignment(Qt.AlignHCenter | Qt.AlignTop)
+            url = d.get("stream_icon") or d.get("cover")
+            self._load_poster(it, url)
+            self.content_list.addItem(it)
 
     def _populate_content(self, items):
         self.content_list.clear()
