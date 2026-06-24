@@ -43,14 +43,19 @@ git rev-list -n 1 vX.Y.Z
 
 ### Flathub PR checklist (v0.7.0)
 
-1. ✅ `type: git` source with pinned tag and commit
+See `docs/FLATHUB_SUBMISSION.md` for the full checklist.
+
+Quick status:
+1. ✅ `type: git` with pinned tag + commit
 2. ✅ `SETUPTOOLS_SCM_PRETEND_VERSION=0.7.0`
 3. ✅ AppStream metainfo validates cleanly
 4. ✅ Desktop file validates cleanly
-5. ✅ `--filesystem=home` not used; minimal permissions documented
-6. [ ] Record a short screen capture: IPTV channel switching + local library browse
-7. [ ] Fill in the Flathub PR checklist on submission
-8. [ ] Review AI policy compliance (all bundled sources reviewed)
+5. ✅ `--filesystem=home` not used
+6. ✅ `--socket=session-bus` removed (named bus access sufficient for MPRIS2)
+7. ✅ All bundled sources pinned with sha256 — no floating branches
+8. ✅ OARS content rating present in metainfo
+9. [ ] Screenshots added to AppStream metainfo
+10. [ ] Fork flathub/flathub and open PR
 
 ### Testing the Flathub manifest
 
