@@ -37,7 +37,6 @@ class MpvWidget(QOpenGLWidget):
             hwdec="vaapi",
             hwdec_codecs="all",
             profile="fast",
-            osc=False,
             input_default_bindings=False,
             cache="yes",
             demuxer_max_bytes="200MiB",

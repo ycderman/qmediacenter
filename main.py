@@ -11,7 +11,6 @@ from PySide6.QtCore import Qt
 
 from iptv import config
 from iptv.xtream import XtreamClient
-from ui.login_dialog import LoginDialog
 from ui.main_window import MainWindow
 from media.mpris import MprisAdapter, ScreenInhibitor
 
@@ -62,14 +61,7 @@ def main():
     # Qt resets LC_NUMERIC from the environment; libmpv requires "C".
     locale.setlocale(locale.LC_NUMERIC, "C")
 
-    # Open straight into the last-used source; only prompt if that fails.
     profile, client = _auto_profile()
-    if profile is None:
-        login = LoginDialog()
-        result = login.exec()
-        if result == LoginDialog.Accepted:
-            profile, client = login.profile, login.client
-        # Rejected (Skip) → open without IPTV; profile/client stay None
 
     win = MainWindow(profile, client)
     win.mpris = MprisAdapter(win.player, initial_volume=win.settings.get("volume", 100))
