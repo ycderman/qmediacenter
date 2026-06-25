@@ -1,14 +1,8 @@
-"""Embedded libmpv player rendered into a Qt OpenGL widget.
-
-Uses libmpv's render API (OpenGL) so it works on both Wayland and X11 —
-unlike `--wid` embedding which only works under X11. mpv handles every
-codec (HEVC, AC3/E-AC3, DTS, ...) with VAAPI hardware decoding.
-"""
+"""Embedded libmpv player rendered into a Qt OpenGL widget."""
 import mpv
-from OpenGL import GL
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtGui import QOpenGLContext
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 
 
 def _get_proc_address(_ctx, name):
@@ -20,15 +14,13 @@ def _get_proc_address(_ctx, name):
 
 
 class MpvWidget(QOpenGLWidget):
-    """A QOpenGLWidget that draws an mpv video surface."""
-
     _frame_ready = Signal()
 
     duration_changed = Signal(float)
     position_changed = Signal(float)
-    pause_changed = Signal(bool)
-    info_changed = Signal(str)
-    tracks_changed = Signal(list)
+    pause_changed    = Signal(bool)
+    info_changed     = Signal(str)
+    tracks_changed   = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,37 +29,51 @@ class MpvWidget(QOpenGLWidget):
             hwdec="vaapi",
             hwdec_codecs="all",
             input_default_bindings=False,
-            cache="yes",
-            demuxer_max_bytes="50MiB",
-            demuxer_max_back_bytes="2MiB",
-            cache_pause=False,
-            user_agent="QtIPTV/0.1",
-            vd_lavc_fast=True,
+            # Fast profile + explicit GPU-light settings for 4K
+            profile="fast",
+            video_sync="audio",
+            interpolation="no",
+            framedrop="decoder",
+            scale="bilinear",
+            cscale="bilinear",
+            dscale="bilinear",
+            dither_depth="no",
+            tone_mapping="clip",
+            hdr_compute_peak="no",
+            # Intel UHD 620 GLES needs rgba8 FBO; without it mpv enters dumb mode
             fbo_format="rgba8",
+            # Decoder threading
+            vd_lavc_threads=0,
+            demuxer_thread="yes",
+            # Default cache for non-live content (overridden per play() call)
+            cache="yes",
+            cache_pause=False,
+            demuxer_max_bytes="512MiB",
+            demuxer_max_back_bytes="128MiB",
+            cache_secs=60,
+            user_agent="QtIPTV/0.1",
             log_handler=self._mpv_log,
             loglevel="warn",
         )
         self._alive = True
-        self._log = __import__("logging").getLogger("mpv")
         self._hwdec = "?"
         self._vw = self._vh = 0
         self._render_ctx = None
         self._frame_ready.connect(self.update)
 
-        self._mpv.observe_property("hwdec-current", self._on_hwdec)
+        self._mpv.observe_property("hwdec-current",  self._on_hwdec)
         self._mpv.observe_property("video-params/w", self._on_vparam)
         self._mpv.observe_property("video-params/h", self._on_vparam)
-        self._mpv.observe_property("duration",    self._on_duration)
-        self._mpv.observe_property("time-pos",    self._on_time_pos)
-        self._mpv.observe_property("pause",       self._on_pause)
-        self._mpv.observe_property("track-list",  self._on_tracks)
+        self._mpv.observe_property("duration",       self._on_duration)
+        self._mpv.observe_property("time-pos",       self._on_time_pos)
+        self._mpv.observe_property("pause",          self._on_pause)
+        self._mpv.observe_property("track-list",     self._on_tracks)
 
     @staticmethod
     def _mpv_log(level, component, message):
         import logging
         logging.getLogger(f"mpv.{component}").warning("[%s] %s", level, message.rstrip())
 
-    # ---- GL lifecycle -------------------------------------------------
     def initializeGL(self):
         try:
             self._proc_addr_cb = mpv.MpvGlGetProcAddressFn(_get_proc_address)
@@ -94,7 +100,6 @@ class MpvWidget(QOpenGLWidget):
             opengl_fbo={"w": w, "h": h, "fbo": fbo},
         )
 
-    # ---- property callbacks ------------------------------------------
     def _on_duration(self, _name, value):
         if self._alive and value is not None:
             self.duration_changed.emit(float(value))
@@ -133,22 +138,21 @@ class MpvWidget(QOpenGLWidget):
         if parts:
             self.info_changed.emit(" · ".join(parts))
 
-    # ---- public API ---------------------------------------------------
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
         if delta != 0:
-            self.seek(10 if delta > 0 else -10, "relative")
+            self.seek(20 if delta > 0 else -20, "relative")
         event.accept()
 
     def play(self, url, live=False):
         if live:
-            self._mpv["cache-pause"] = False
-            self._mpv["demuxer-max-bytes"] = "4MiB"
-            self._mpv["demuxer-max-back-bytes"] = "512KiB"
+            self._mpv["demuxer-max-bytes"]      = "64MiB"
+            self._mpv["demuxer-max-back-bytes"] = "8MiB"
+            self._mpv["cache-secs"]             = 10
         else:
-            self._mpv["cache-pause"] = False
-            self._mpv["demuxer-max-bytes"] = "50MiB"
-            self._mpv["demuxer-max-back-bytes"] = "2MiB"
+            self._mpv["demuxer-max-bytes"]      = "512MiB"
+            self._mpv["demuxer-max-back-bytes"] = "128MiB"
+            self._mpv["cache-secs"]             = 60
         self._mpv.play(url)
         self._mpv.pause = False
 
