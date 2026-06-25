@@ -31,8 +31,9 @@ class MpvWidget(QOpenGLWidget):
             input_default_bindings=False,
             # Fast profile + explicit GPU-light settings for 4K
             profile="fast",
+            video_sync="audio",
             interpolation="no",
-            framedrop="vo",
+            framedrop="decoder",
             scale="bilinear",
             cscale="bilinear",
             dscale="bilinear",
@@ -144,18 +145,11 @@ class MpvWidget(QOpenGLWidget):
         event.accept()
 
     def play(self, url, live=False):
-        try:
-            self._mpv.speed = 1.0
-            self._mpv["audio-delay"] = 0
-        except Exception:
-            pass
         if live:
-            self._mpv["cache-pause"]            = False
             self._mpv["demuxer-max-bytes"]      = "64MiB"
             self._mpv["demuxer-max-back-bytes"] = "8MiB"
             self._mpv["cache-secs"]             = 10
         else:
-            self._mpv["cache-pause"]            = True
             self._mpv["demuxer-max-bytes"]      = "512MiB"
             self._mpv["demuxer-max-back-bytes"] = "128MiB"
             self._mpv["cache-secs"]             = 60
